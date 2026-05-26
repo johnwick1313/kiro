@@ -110,6 +110,24 @@ global.processOrders = function (server) {
             res = global.executeBuy(data, playerData, order.symbol, order.shares)
         } else if (order.type === 'sell') {
             res = global.executeSell(data, playerData, order.symbol, order.shares)
+        } else if (order.type === 'deposit') {
+            // 웹에서 요청한 에메랄드 충전 — 인벤토리는 서버 측에서만 차감 가능
+            // 온라인 플레이어에게 인게임 처리 위임
+            const onlinePlayer2 = server ? server.getPlayer(order.uuid) : null
+            if (onlinePlayer2) {
+                onlinePlayer2.chat('!주식 충전 ' + order.emeralds)
+                res = { ok: true, message: '충전 명령 전달됨' }
+            } else {
+                res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 !주식 충전 명령어를 사용하세요.' }
+            }
+        } else if (order.type === 'withdraw') {
+            const onlinePlayer3 = server ? server.getPlayer(order.uuid) : null
+            if (onlinePlayer3) {
+                onlinePlayer3.chat('!주식 출금 ' + order.emeralds)
+                res = { ok: true, message: '출금 명령 전달됨' }
+            } else {
+                res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 !주식 출금 명령어를 사용하세요.' }
+            }
         } else {
             res = { ok: false, message: '알 수 없는 주문 타입' }
         }

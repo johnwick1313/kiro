@@ -1,114 +1,265 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>선릿밸리 주식 거래소 :: SUNLIT EXCHANGE</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunlit Exchange</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="scanlines"></div>
-    <div class="grid-bg"></div>
 
-    <header class="topbar">
-        <div class="logo">
-            <span class="logo-icon">$</span>
-            <span class="logo-text">SUNLIT<span class="accent">EXCHANGE</span></span>
-            <span class="logo-sub">v1.0</span>
+<!-- ===== 네비게이션 ===== -->
+<nav class="nav">
+  <div class="nav-left">
+    <div class="nav-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="16 7 22 7 22 13" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Sunlit<b>Exchange</b></span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-view="market">시장</button>
+      <button class="nav-tab" data-view="portfolio">포트폴리오</button>
+      <button class="nav-tab" data-view="history">거래내역</button>
+      <button class="nav-tab admin-tab hidden" data-view="admin" id="admin-nav-btn">⚙ 관리자</button>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="nav-clock" id="nav-clock">--:--:--</div>
+    <div class="nav-badge" id="nav-badge">
+      <span class="conn-dot" id="conn-dot"></span>
+      <span id="conn-label">연결 중</span>
+    </div>
+    <div class="nav-user" id="nav-user-area">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <span id="user-display-name">로그인 중...</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== 시장 뷰 ===== -->
+<div class="view active" id="view-market">
+  <div class="market-grid">
+
+    <!-- 좌: 종목 사이드바 -->
+    <aside class="stock-sidebar">
+      <div class="sidebar-top">
+        <input class="search-input" id="search-input" type="text" placeholder="종목 검색...">
+        <div class="chips" id="sector-chips">
+          <button class="chip on" data-sector="ALL">전체</button>
+          <button class="chip" data-sector="농업">농업</button>
+          <button class="chip" data-sector="축산업">축산</button>
+          <button class="chip" data-sector="수산업">수산</button>
+          <button class="chip" data-sector="임업">임업</button>
+          <button class="chip" data-sector="광업">광업</button>
+          <button class="chip" data-sector="마법">마법</button>
         </div>
-        <div class="status-bar">
-            <div class="status-item">
-                <span class="label">시간</span>
-                <span class="value" id="clock">--:--:--</span>
-            </div>
-            <div class="status-item">
-                <span class="label">시세 업데이트</span>
-                <span class="value" id="last-update">--</span>
-            </div>
-            <div class="status-item">
-                <span class="label">연결</span>
-                <span class="value" id="conn-status">
-                    <span class="dot offline"></span>
-                    <span id="conn-text">접속 중...</span>
-                </span>
-            </div>
+      </div>
+      <div class="stock-list" id="stock-list"></div>
+    </aside>
+
+    <!-- 중: 차트 + 주문 -->
+    <main class="chart-area">
+      <div class="stock-hero" id="stock-hero">
+        <div class="hero-left">
+          <div class="hero-symbol" id="hero-symbol">--</div>
+          <div class="hero-name" id="hero-name">종목을 선택하세요</div>
+          <span class="hero-sector" id="hero-sector"></span>
         </div>
-        <div class="login-bar">
-            <input type="text" id="username-input" placeholder="플레이어명 입력" autocomplete="off">
-            <button id="login-btn">로그인</button>
+        <div class="hero-right">
+          <div class="hero-price" id="hero-price">--</div>
+          <div class="hero-change" id="hero-change"></div>
         </div>
-    </header>
+      </div>
 
-    <main class="layout">
-        <!-- 좌측: 종목 리스트 -->
-        <section class="panel stocks-panel">
-            <header class="panel-header">
-                <h2>실시간 시세</h2>
-                <div class="filter-bar">
-                    <button class="filter-btn active" data-sector="ALL">전체</button>
-                    <button class="filter-btn" data-sector="농업">농업</button>
-                    <button class="filter-btn" data-sector="축산업">축산</button>
-                    <button class="filter-btn" data-sector="수산업">수산</button>
-                    <button class="filter-btn" data-sector="임업">임업</button>
-                    <button class="filter-btn" data-sector="광업">광업</button>
-                    <button class="filter-btn" data-sector="마법">마법</button>
-                </div>
-            </header>
-            <div class="stocks-list" id="stocks-list">
-                <div class="placeholder">데이터 로딩 중...</div>
-            </div>
-        </section>
+      <div class="ohlc-row" id="ohlc-row">
+        <div class="ohlc-cell"><div class="ohlc-lbl">시가</div><div class="ohlc-val" id="o-open">--</div></div>
+        <div class="ohlc-cell"><div class="ohlc-lbl">고가</div><div class="ohlc-val up" id="o-high">--</div></div>
+        <div class="ohlc-cell"><div class="ohlc-lbl">저가</div><div class="ohlc-val down" id="o-low">--</div></div>
+        <div class="ohlc-cell"><div class="ohlc-lbl">기준가</div><div class="ohlc-val" id="o-base">--</div></div>
+        <div class="ohlc-cell"><div class="ohlc-lbl">변동성</div><div class="ohlc-val" id="o-vol">--</div></div>
+      </div>
 
-        <!-- 중앙: 차트 + 거래 -->
-        <section class="panel chart-panel">
-            <header class="panel-header">
-                <h2 id="chart-title">종목을 선택하세요</h2>
-                <div class="chart-meta" id="chart-meta"></div>
-            </header>
-            <div class="chart-wrapper">
-                <canvas id="price-chart"></canvas>
-            </div>
-            <div class="trade-panel" id="trade-panel">
-                <div class="trade-row">
-                    <label>수량</label>
-                    <input type="number" id="trade-qty" min="1" value="1">
-                    <span class="estimate" id="trade-estimate">예상: --</span>
-                </div>
-                <div class="trade-buttons">
-                    <button class="btn-buy"  id="buy-btn"  disabled>매수</button>
-                    <button class="btn-sell" id="sell-btn" disabled>매도</button>
-                </div>
-                <div class="trade-message" id="trade-message"></div>
-            </div>
-        </section>
+      <div class="chart-wrap">
+        <canvas id="price-chart"></canvas>
+        <div class="chart-placeholder" id="chart-placeholder">종목을 선택하면 차트가 표시됩니다</div>
+      </div>
 
-        <!-- 우측: 포트폴리오 -->
-        <section class="panel portfolio-panel">
-            <header class="panel-header">
-                <h2>포트폴리오</h2>
-                <span class="player-tag" id="player-tag">미로그인</span>
-            </header>
-            <div class="portfolio-summary" id="portfolio-summary">
-                <div class="placeholder">로그인 후 표시됩니다</div>
+      <!-- 주문 박스 -->
+      <div class="order-box">
+        <div class="order-type-tabs">
+          <button class="ot-tab buy active" id="ot-buy">매수</button>
+          <button class="ot-tab sell" id="ot-sell">매도</button>
+        </div>
+        <div class="order-form">
+          <div class="form-row">
+            <label>수량</label>
+            <div class="qty-row">
+              <button class="qty-btn" id="btn-minus">−</button>
+              <input type="number" id="qty-input" value="1" min="1">
+              <button class="qty-btn" id="btn-plus">+</button>
             </div>
-            <div class="portfolio-holdings" id="portfolio-holdings"></div>
-            <header class="panel-header sub">
-                <h3>최근 거래</h3>
-            </header>
-            <div class="portfolio-history" id="portfolio-history"></div>
-        </section>
+          </div>
+          <div class="order-calc">
+            <div class="calc-row"><span>단가</span><span id="calc-price">--</span></div>
+            <div class="calc-row"><span>소계</span><span id="calc-sub">--</span></div>
+            <div class="calc-row"><span>수수료 (0.5%)</span><span id="calc-fee">--</span></div>
+            <div class="calc-row total-row"><span>합계</span><span id="calc-total">--</span></div>
+          </div>
+          <button class="order-btn buy-btn" id="order-btn" disabled>종목을 선택하세요</button>
+          <div class="order-feedback" id="order-feedback"></div>
+        </div>
+      </div>
     </main>
 
-    <footer class="bottombar">
-        <span>KubeJS Bridge</span>
-        <span id="bridge-info">--</span>
-        <span class="ticker" id="ticker"></span>
-    </footer>
+    <!-- 우: 계좌 패널 -->
+    <aside class="account-sidebar">
+      <div class="acc-section">
+        <div class="acc-title">내 계좌</div>
+        <div class="acc-balance-big" id="acc-balance">--</div>
+        <div class="acc-label">현금 잔고</div>
+        <div class="acc-divider"></div>
+        <div class="acc-row"><span>총 자산</span><b id="acc-total">--</b></div>
+        <div class="acc-row"><span>투자원금</span><b id="acc-invested">--</b></div>
+        <div class="acc-row"><span>평가손익</span><b class="pl-num" id="acc-pl">--</b></div>
+        <div class="acc-row"><span>수익률</span><b class="pl-num" id="acc-plpct">--</b></div>
+      </div>
 
-    <script src="app.js"></script>
+      <div class="acc-section">
+        <div class="acc-title">보유 종목</div>
+        <div id="holdings-list"><div class="acc-empty">보유 종목 없음</div></div>
+      </div>
+
+      <div class="acc-section">
+        <div class="acc-title">에메랄드 환전</div>
+        <div class="exchange-row">
+          <input type="number" id="dep-qty" placeholder="에메랄드 수량" min="1">
+          <button class="exch-btn dep" id="dep-btn">충전</button>
+        </div>
+        <div class="exchange-row">
+          <input type="number" id="with-qty" placeholder="골드 → 에메랄드" min="1">
+          <button class="exch-btn with" id="with-btn">출금</button>
+        </div>
+        <div class="exch-msg" id="exch-msg"></div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- ===== 포트폴리오 뷰 ===== -->
+<div class="view" id="view-portfolio">
+  <div class="inner-page">
+    <h2 class="page-h2">포트폴리오</h2>
+    <div class="pf-summary-cards" id="pf-cards"></div>
+    <div class="table-wrap">
+      <table class="tbl" id="pf-table">
+        <thead><tr>
+          <th>종목</th><th>보유수량</th><th>평균단가</th>
+          <th>현재가</th><th>평가금액</th><th>손익</th><th>수익률</th><th>액션</th>
+        </tr></thead>
+        <tbody id="pf-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 거래내역 뷰 ===== -->
+<div class="view" id="view-history">
+  <div class="inner-page">
+    <h2 class="page-h2">거래내역</h2>
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>시간</th><th>구분</th><th>종목</th>
+          <th>수량</th><th>단가</th><th>수수료</th><th>합계</th><th>손익</th>
+        </tr></thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 관리자 뷰 (OP 전용) ===== -->
+<div class="view" id="view-admin">
+  <div class="inner-page">
+    <h2 class="page-h2">⚙ 관리자 — 종목 관리</h2>
+    <div class="admin-notice">이 페이지는 OP(서버 관리자) 전용입니다.</div>
+
+    <!-- 종목 추가 폼 -->
+    <div class="admin-card">
+      <div class="admin-card-title">새 종목 추가</div>
+      <div class="admin-form">
+        <div class="admin-field">
+          <label>심볼 (영문 대문자, 최대 5자)</label>
+          <input type="text" id="ad-symbol" placeholder="APPLE" maxlength="5">
+        </div>
+        <div class="admin-field">
+          <label>종목명</label>
+          <input type="text" id="ad-name" placeholder="사과 농장 주식회사">
+        </div>
+        <div class="admin-field">
+          <label>섹터</label>
+          <select id="ad-sector">
+            <option>농업</option><option>축산업</option><option>수산업</option>
+            <option>임업</option><option>광업</option><option>마법</option><option>기타</option>
+          </select>
+        </div>
+        <div class="admin-field">
+          <label>기준 가격 (G)</label>
+          <input type="number" id="ad-price" placeholder="100" min="1">
+        </div>
+        <div class="admin-field">
+          <label>변동성 (0.01 ~ 0.30)</label>
+          <input type="number" id="ad-vol" placeholder="0.05" min="0.01" max="0.30" step="0.01">
+        </div>
+        <div class="admin-field">
+          <label>트렌드 (-0.1 ~ 0.1)</label>
+          <input type="number" id="ad-trend" placeholder="0.02" min="-0.1" max="0.1" step="0.01">
+        </div>
+        <button class="admin-btn add-btn" id="ad-add-btn">+ 종목 추가</button>
+        <div class="admin-msg" id="admin-msg"></div>
+      </div>
+    </div>
+
+    <!-- 현재 종목 목록 -->
+    <div class="admin-card">
+      <div class="admin-card-title">현재 종목 목록</div>
+      <div class="table-wrap">
+        <table class="tbl" id="admin-stock-table">
+          <thead><tr>
+            <th>심볼</th><th>종목명</th><th>섹터</th>
+            <th>기준가</th><th>변동성</th><th>트렌드</th><th>현재가</th><th>관리</th>
+          </tr></thead>
+          <tbody id="admin-stock-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 전체 플레이어 목록 -->
+    <div class="admin-card">
+      <div class="admin-card-title">전체 플레이어</div>
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead><tr>
+            <th>닉네임</th><th>잔고</th><th>보유 종목 수</th><th>총 거래 수</th>
+          </tr></thead>
+          <tbody id="admin-player-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 하단 티커 ===== -->
+<div class="ticker-bar">
+  <div class="ticker-inner" id="ticker-inner"></div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

@@ -30,6 +30,10 @@ global.STOCKS = [
 
 // 글로벌 설정값
 global.STOCK_CONFIG = {
+    // 커스텀 종목 파일 경로 (웹 관리자 페이지에서 추가/삭제)
+    customStocksPath: 'kubejs/exports/stocks_custom.json',
+    // OP 목록 파일 경로
+    opsPath: 'kubejs/exports/stocks_ops.json',
     // 가격 갱신 주기 (틱 단위, 20틱 = 1초)
     updateIntervalTicks: 200,           // 10초마다 갱신
 

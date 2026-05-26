@@ -1,437 +1,629 @@
-// =======================================================================
-// 선릿밸리 주식 거래소 - 프론트엔드 로직
-// =======================================================================
+// =============================================================
+// Sunlit Exchange — 프론트엔드 메인 로직
+// =============================================================
 
-const POLL_MS = 3000  // 3초마다 시세 갱신
+const POLL_MS  = 3000
+const FEE_RATE = 0.005
 
-const state = {
-    prices:        {},
-    meta:          {},
-    selected:      null,        // 현재 보고 있는 종목 심볼
-    sectorFilter:  'ALL',
-    user: {
-        username: null,
-        uuid:     null,
-        data:     null,
-    },
-    chart:           null,
-    lastPrices:      {},        // 가격 펄스 효과용
+// ── 상태 ──
+const S = {
+  prices:      {},
+  meta:        {},
+  selected:    null,
+  orderSide:   'buy',   // 'buy' | 'sell'
+  sectorFilter:'ALL',
+  searchQuery: '',
+  user: { uuid: null, username: null, data: null, isOp: false },
+  chart:       null,
+  prevPrices:  {},
+  lastPriceTs: {},
 }
 
-// ---------- DOM 헬퍼 ----------
-const $  = (sel) => document.querySelector(sel)
-const $$ = (sel) => document.querySelectorAll(sel)
+// ── DOM ──
+const $  = id => document.getElementById(id)
+const $$ = sel => document.querySelectorAll(sel)
 
-// ---------- 포맷터 ----------
-const fmtMoney = (n) => Number(n || 0).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const fmtPct   = (n) => (n >= 0 ? '+' : '') + Number(n || 0).toFixed(2) + '%'
-const fmtTime  = (ts) => ts ? new Date(ts).toLocaleTimeString('ko-KR', { hour12: false }) : '--'
+// ── 포맷 ──
+const fmtG   = n => (+(n||0)).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' G'
+const fmtPct = n => (n>=0?'+':'') + (+(n||0)).toFixed(2) + '%'
+const fmtTime= ts => ts ? new Date(ts).toLocaleTimeString('ko-KR',{hour12:false}) : '--'
+const fmtDate= ts => ts ? new Date(ts).toLocaleString('ko-KR',{hour12:false}) : '--'
+const plClass= n => n >= 0 ? 'up' : 'down'
 
-// ---------- API ----------
+// ── API ──
 async function api(path, opts) {
-    try {
-        const r = await fetch(path, opts)
-        return await r.json()
-    } catch (e) {
-        return { ok: false, message: '네트워크 오류: ' + e.message }
+  try {
+    const r = await fetch(path, opts)
+    return await r.json()
+  } catch(e) { return { ok:false, message:'네트워크 오류: '+e.message } }
+}
+
+// =============================================================
+// 자동 로그인 (URL ?uuid= 파라미터)
+// =============================================================
+async function autoLogin() {
+  const params = new URLSearchParams(location.search)
+  const uuid   = params.get('uuid')
+  if (!uuid) {
+    setUserDisplay(null)
+    return
+  }
+
+  // 서버에 UUID → 플레이어 정보 + OP 여부 확인
+  const r = await api('/api/player/' + encodeURIComponent(uuid))
+  if (!r.ok) {
+    setUserDisplay(null)
+    showConnLabel('UUID를 찾을 수 없음 (인게임 접속 필요)')
+    return
+  }
+
+  S.user.uuid     = uuid
+  S.user.username = r.username
+  S.user.data     = r
+  S.user.isOp     = !!r.isOp
+
+  setUserDisplay(r.username, r.isOp)
+  renderAccount()
+
+  // OP 이면 관리자 탭 표시
+  if (r.isOp) {
+    $('admin-nav-btn').classList.remove('hidden')
+  }
+}
+
+function setUserDisplay(name, isOp) {
+  if (!name) {
+    $('user-avatar').textContent     = '?'
+    $('user-display-name').textContent = '미접속'
+    return
+  }
+  $('user-avatar').textContent       = name[0].toUpperCase()
+  $('user-display-name').textContent = name + (isOp ? ' 👑' : '')
+}
+
+function showConnLabel(msg) {
+  $('conn-label').textContent = msg || ''
+}
+
+// =============================================================
+// 상태 폴링
+// =============================================================
+async function poll() {
+  const d = await api('/api/state')
+  if (!d || !d.ok) {
+    $('conn-dot').className = 'conn-dot offline'
+    $('conn-label').textContent = '오프라인'
+    return
+  }
+  $('conn-dot').className = 'conn-dot online'
+  $('conn-label').textContent = '실시간'
+
+  S.prevPrices = Object.fromEntries(
+    Object.entries(S.prices).map(([k,v]) => [k, v.current])
+  )
+  S.prices = d.prices || {}
+  S.meta   = d.meta   || {}
+
+  renderStockList()
+  renderTicker()
+  updateCalc()
+  if (S.selected) renderChart()
+
+  // 플레이어 데이터 갱신
+  if (S.user.uuid) {
+    const r = await api('/api/player/' + encodeURIComponent(S.user.uuid))
+    if (r && r.ok) {
+      S.user.data  = r
+      S.user.isOp  = !!r.isOp
+      renderAccount()
     }
+  }
 }
 
-async function fetchState() {
-    const data = await api('/api/state')
-    if (!data || !data.ok) {
-        setConnection(false, data && data.message)
-        return null
-    }
-    setConnection(true, '온라인 · ' + (Object.keys(data.prices || {}).length) + '개 종목')
-    return data
-}
+// =============================================================
+// 종목 리스트
+// =============================================================
+function renderStockList() {
+  const stocks = (S.meta.stocks || []).filter(s => {
+    if (S.sectorFilter !== 'ALL' && s.sector !== S.sectorFilter) return false
+    if (S.searchQuery && !s.symbol.includes(S.searchQuery.toUpperCase()) &&
+        !s.name.includes(S.searchQuery)) return false
+    return true
+  })
 
-async function fetchPlayer(identifier) {
-    return await api('/api/player/' + encodeURIComponent(identifier))
-}
+  const container = $('stock-list')
+  const existing  = new Map([...container.querySelectorAll('.stock-item')].map(el => [el.dataset.sym, el]))
 
-async function submitOrder(type, symbol, shares) {
-    if (!state.user.username) {
-        return { ok: false, message: '먼저 로그인하세요' }
-    }
-    return await api('/api/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            uuid:     state.user.uuid,
-            username: state.user.username,
-            type, symbol, shares,
-        }),
-    })
-}
+  const seen = new Set()
+  stocks.forEach(s => {
+    const p   = S.prices[s.symbol] || {}
+    const cur = p.current || 0
+    const chg = p.change  || 0
+    const prev= S.prevPrices[s.symbol]
 
-async function fetchInfo() {
-    const r = await api('/api/info')
-    if (r && r.kubejsPath) {
-        $('#bridge-info').textContent = 'KubeJS: ' + r.kubejsPath
-    }
-}
-
-// ---------- UI 업데이트 ----------
-function setConnection(online, text) {
-    const dot = $('#conn-status .dot')
-    dot.classList.toggle('online',  !!online)
-    dot.classList.toggle('offline', !online)
-    $('#conn-text').textContent = text || (online ? '온라인' : '오프라인')
-}
-
-function renderStocksList() {
-    const container = $('#stocks-list')
-    const stocks = state.meta.stocks || []
-    if (!stocks.length) {
-        container.innerHTML = '<div class="placeholder">시세 데이터 대기 중...</div>'
-        return
+    let el = existing.get(s.symbol)
+    if (!el) {
+      el = document.createElement('div')
+      el.className = 'stock-item'
+      el.dataset.sym = s.symbol
+      el.innerHTML = `
+        <div class="si-symbol"></div><div class="si-price"></div>
+        <div class="si-name"></div><div class="si-change"></div>`
+      el.addEventListener('click', () => selectStock(s.symbol))
+      container.appendChild(el)
     }
 
-    const filter = state.sectorFilter
-    const filtered = stocks.filter(s => filter === 'ALL' || s.sector === filter)
+    el.querySelector('.si-symbol').textContent = s.symbol
+    el.querySelector('.si-name').textContent   = s.name
+    el.querySelector('.si-price').textContent  = fmtG(cur)
+    el.querySelector('.si-price').className    = 'si-price ' + plClass(chg)
 
-    // 기존 카드 유지 (애니메이션을 위해)
-    const existing = new Map()
-    container.querySelectorAll('.stock-card').forEach(el => {
-        existing.set(el.dataset.symbol, el)
-    })
+    const chgEl = el.querySelector('.si-change')
+    chgEl.textContent = fmtPct(chg)
+    chgEl.className   = 'si-change ' + plClass(chg)
 
-    const seen = new Set()
-    filtered.forEach(s => {
-        const price = state.prices[s.symbol] || {}
-        const last  = state.lastPrices[s.symbol]
-        const cur   = price.current || 0
-        const ch    = price.change  || 0
+    el.classList.toggle('active', S.selected === s.symbol)
 
-        let card = existing.get(s.symbol)
-        if (!card) {
-            card = document.createElement('div')
-            card.className = 'stock-card'
-            card.dataset.symbol = s.symbol
-            card.innerHTML = `
-                <div class="symbol"></div>
-                <div class="price"></div>
-                <div class="name"></div>
-                <div class="change"></div>
-            `
-            card.addEventListener('click', () => selectStock(s.symbol))
-            container.appendChild(card)
-        }
+    // 가격 변동 플래시
+    if (prev !== undefined && prev !== cur) {
+      el.classList.remove('flash-up','flash-down')
+      void el.offsetWidth
+      el.classList.add(cur > prev ? 'flash-up' : 'flash-down')
+    }
+    seen.add(s.symbol)
+  })
 
-        card.querySelector('.symbol').textContent = s.symbol
-        card.querySelector('.name').textContent   = s.name
-        card.querySelector('.price').textContent  = fmtMoney(cur) + ' G'
-
-        const changeEl = card.querySelector('.change')
-        changeEl.textContent = fmtPct(ch)
-        changeEl.classList.toggle('up',   ch >= 0)
-        changeEl.classList.toggle('down', ch < 0)
-
-        // 가격 변동 펄스
-        if (last !== undefined && last !== cur) {
-            card.classList.remove('pulse-up', 'pulse-down')
-            void card.offsetWidth  // reflow
-            card.classList.add(cur > last ? 'pulse-up' : 'pulse-down')
-        }
-
-        card.classList.toggle('active', state.selected === s.symbol)
-        seen.add(s.symbol)
-    })
-
-    // 사라진 카드 제거
-    existing.forEach((el, sym) => { if (!seen.has(sym)) el.remove() })
-
-    // 정렬: 활성 -> 변동률 큰 순
-    const cards = Array.from(container.querySelectorAll('.stock-card'))
-    cards.sort((a, b) => {
-        const ca = state.prices[a.dataset.symbol]?.change || 0
-        const cb = state.prices[b.dataset.symbol]?.change || 0
-        return Math.abs(cb) - Math.abs(ca)
-    })
-    cards.forEach(el => container.appendChild(el))
+  existing.forEach((el, sym) => { if (!seen.has(sym)) el.remove() })
 }
 
-function renderTicker() {
-    const stocks = state.meta.stocks || []
-    const parts = stocks.map(s => {
-        const p = state.prices[s.symbol] || {}
-        const ch = p.change || 0
-        const sign = ch >= 0 ? '▲' : '▼'
-        return `${s.symbol} ${fmtMoney(p.current||0)} ${sign}${Math.abs(ch).toFixed(2)}%`
-    })
-    $('#ticker').textContent = parts.join('   ◆   ')
-}
-
+// =============================================================
+// 종목 선택 & 차트
+// =============================================================
 function selectStock(symbol) {
-    state.selected = symbol
-    renderStocksList()
-    renderChart()
-    renderTradePanel()
+  S.selected = symbol
+  renderStockList()
+  renderHero()
+  renderChart()
+  updateCalc()
+  $('order-btn').disabled = !symbol
+}
+
+function renderHero() {
+  const sym = S.selected
+  if (!sym) return
+  const s = (S.meta.stocks||[]).find(x => x.symbol === sym) || {}
+  const p = S.prices[sym] || {}
+
+  $('hero-symbol').textContent = sym
+  $('hero-name').textContent   = s.name || sym
+  $('hero-sector').textContent = s.sector || ''
+  $('hero-price').textContent  = fmtG(p.current)
+  $('hero-price').className    = 'hero-price ' + plClass(p.change)
+  $('hero-change').textContent = fmtPct(p.change) + (p.change >= 0 ? ' ▲' : ' ▼')
+  $('hero-change').className   = 'hero-change ' + plClass(p.change)
+
+  $('o-open').textContent = fmtG(p.open)
+  $('o-high').textContent = fmtG(p.high)
+  $('o-low').textContent  = fmtG(p.low)
+  $('o-base').textContent = fmtG(s.basePrice)
+  $('o-vol').textContent  = s.volatility ? (s.volatility * 100).toFixed(0) + '%' : '--'
 }
 
 function renderChart() {
-    const sym = state.selected
-    if (!sym) {
-        $('#chart-title').textContent = '종목을 선택하세요'
-        $('#chart-meta').innerHTML = ''
-        if (state.chart) { state.chart.destroy(); state.chart = null }
-        return
-    }
+  const sym = S.selected
+  if (!sym) return
 
-    const stockMeta = (state.meta.stocks || []).find(s => s.symbol === sym) || {}
-    const price = state.prices[sym] || {}
-    const history = price.history || []
+  const p       = S.prices[sym] || {}
+  const history = p.history || []
+  const isUp    = (p.change || 0) >= 0
+  const color   = isUp ? '#22c55e' : '#ef4444'
+  const labels  = history.map(h => fmtTime(h.t))
+  const data    = history.map(h => h.p)
 
-    $('#chart-title').textContent = (stockMeta.name || sym) + ' (' + sym + ')'
-    $('#chart-meta').innerHTML = `
-        <div>현재가: <span class="v">${fmtMoney(price.current || 0)} G</span></div>
-        <div>변동: <span class="v ${price.change >= 0 ? 'up' : 'down'}">${fmtPct(price.change || 0)}</span></div>
-        <div>고가: <span class="v">${fmtMoney(price.high || 0)}</span></div>
-        <div>저가: <span class="v">${fmtMoney(price.low || 0)}</span></div>
-        <div>섹터: <span class="v">${stockMeta.sector || '-'}</span></div>
-    `
+  $('chart-placeholder').classList.add('hidden')
 
-    const labels = history.map(h => fmtTime(h.t))
-    const data   = history.map(h => h.p)
-    const isUp   = (price.change || 0) >= 0
-    const color  = isUp ? '#00ff88' : '#ff3860'
+  if (S.chart) {
+    S.chart.data.labels = labels
+    S.chart.data.datasets[0].data            = data
+    S.chart.data.datasets[0].borderColor     = color
+    S.chart.data.datasets[0].backgroundColor = isUp ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)'
+    S.chart.update('none')
+    return
+  }
 
-    const ctx = document.getElementById('price-chart').getContext('2d')
-
-    if (state.chart) {
-        state.chart.data.labels = labels
-        state.chart.data.datasets[0].data = data
-        state.chart.data.datasets[0].borderColor = color
-        state.chart.data.datasets[0].backgroundColor = isUp
-            ? 'rgba(0,255,136,0.15)' : 'rgba(255,56,96,0.15)'
-        state.chart.update('none')
-        return
-    }
-
-    state.chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: sym,
-                data,
-                borderColor: color,
-                backgroundColor: isUp ? 'rgba(0,255,136,0.15)' : 'rgba(255,56,96,0.15)',
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                tension: 0.25,
-                fill: true,
-            }],
+  const ctx = $('price-chart').getContext('2d')
+  S.chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor:     color,
+        backgroundColor: isUp ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      scales: {
+        x: {
+          grid: { color:'rgba(255,255,255,0.04)' },
+          ticks: {
+            color:'#7b869e', font:{ family:'JetBrains Mono', size:10 },
+            maxTicksLimit:8, maxRotation:0, autoSkip:true,
+          },
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255,255,255,0.04)' },
-                    ticks: {
-                        color: '#6b7299', font: { family: 'JetBrains Mono', size: 10 },
-                        maxRotation: 0, autoSkip: true, maxTicksLimit: 8,
-                    },
-                },
-                y: {
-                    grid: { color: 'rgba(255,255,255,0.04)' },
-                    ticks: {
-                        color: '#6b7299', font: { family: 'JetBrains Mono', size: 10 },
-                        callback: (v) => fmtMoney(v) + ' G',
-                    },
-                },
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: 'rgba(15,20,36,0.95)',
-                    borderColor: color, borderWidth: 1,
-                    titleColor: '#e0e7ff', bodyColor: '#e0e7ff',
-                    titleFont: { family: 'Orbitron', size: 11 },
-                    bodyFont:  { family: 'JetBrains Mono', size: 12 },
-                    padding: 10,
-                    callbacks: {
-                        label: (c) => '가격: ' + fmtMoney(c.parsed.y) + ' G',
-                    },
-                },
-            },
+        y: {
+          grid: { color:'rgba(255,255,255,0.04)' },
+          position: 'right',
+          ticks: {
+            color:'#7b869e', font:{ family:'JetBrains Mono', size:10 },
+            callback: v => v.toLocaleString('ko-KR',{maximumFractionDigits:0}) + ' G',
+          },
         },
-    })
+      },
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          backgroundColor:'rgba(22,27,39,0.97)',
+          borderColor: color,
+          borderWidth: 1,
+          titleColor:'#e8eaf0',
+          bodyColor:'#e8eaf0',
+          titleFont:{ family:'JetBrains Mono', size:11 },
+          bodyFont:{ family:'JetBrains Mono', size:13 },
+          padding:10,
+          callbacks: {
+            title: items => items[0].label,
+            label: item  => ' ' + fmtG(item.parsed.y),
+          }
+        },
+      },
+    },
+  })
 }
 
-function renderTradePanel() {
-    const hasUser  = !!state.user.username
-    const selected = state.selected
+// =============================================================
+// 계좌 패널
+// =============================================================
+function renderAccount() {
+  const d = S.user.data
+  if (!d) return
 
-    $('#buy-btn').disabled  = !(hasUser && selected)
-    $('#sell-btn').disabled = !(hasUser && selected)
+  const t = d.totals || {}
+  $('acc-balance').textContent  = fmtG(t.cash)
+  $('acc-total').textContent    = fmtG(t.value)
+  $('acc-invested').textContent = fmtG(t.invested)
 
-    updateEstimate()
+  const plEl    = $('acc-pl')
+  const plPctEl = $('acc-plpct')
+  plEl.textContent    = (t.pl >= 0 ? '+' : '') + fmtG(t.pl)
+  plPctEl.textContent = fmtPct(t.plPct)
+  plEl.className    = 'pl-num ' + (t.pl >= 0 ? 'pos' : 'neg')
+  plPctEl.className = 'pl-num ' + (t.pl >= 0 ? 'pos' : 'neg')
+
+  // 보유 종목
+  const hl = $('holdings-list')
+  const portfolio = d.portfolio || []
+  if (!portfolio.length) {
+    hl.innerHTML = '<div class="acc-empty">보유 종목 없음</div>'
+  } else {
+    hl.innerHTML = portfolio.map(h => `
+      <div class="holding-row">
+        <div class="hr-sym">${h.symbol}</div>
+        <div class="hr-val">${fmtG(h.value)}</div>
+        <div class="hr-meta">${h.shares}주 @${fmtG(h.avg)}</div>
+        <div class="hr-pl ${plClass(h.pl)}">${fmtPct(h.plPct)}</div>
+      </div>`).join('')
+  }
+
+  // 포트폴리오 탭도 갱신
+  renderPortfolioTab()
+  renderHistoryTab()
 }
 
-function updateEstimate() {
-    const sym = state.selected
-    const qty = parseInt($('#trade-qty').value) || 0
-    const price = (state.prices[sym] || {}).current || 0
-    const total = price * qty
-    const fee   = total * ((state.meta.config?.tradeFee || 0.5) / 100)
-    $('#trade-estimate').textContent = sym
-        ? `예상: ${fmtMoney(total)} G (수수료 ${fmtMoney(fee)})`
-        : '예상: --'
+// =============================================================
+// 포트폴리오 탭
+// =============================================================
+function renderPortfolioTab() {
+  const d = S.user.data
+  const t = d ? (d.totals||{}) : {}
+
+  // 요약 카드
+  $('pf-cards').innerHTML = [
+    ['총 자산',   fmtG(t.value),    ''],
+    ['현금 잔고', fmtG(t.cash),     ''],
+    ['투자 원금', fmtG(t.invested), ''],
+    ['평가 손익', (t.pl>=0?'+':'')+fmtG(t.pl), plClass(t.pl)],
+  ].map(([lbl,val,cls]) => `
+    <div class="pf-card">
+      <div class="pf-card-label">${lbl}</div>
+      <div class="pf-card-val ${cls}">${val}</div>
+    </div>`).join('')
+
+  // 테이블
+  const portfolio = d ? (d.portfolio||[]) : []
+  $('pf-tbody').innerHTML = portfolio.length
+    ? portfolio.map(h => `
+      <tr>
+        <td><span class="sym-badge">${h.symbol}</span></td>
+        <td>${h.shares.toLocaleString()}주</td>
+        <td>${fmtG(h.avg)}</td>
+        <td>${fmtG(h.price)}</td>
+        <td>${fmtG(h.value)}</td>
+        <td class="${plClass(h.pl)}">${(h.pl>=0?'+':'')+fmtG(h.pl)}</td>
+        <td class="${plClass(h.plPct)}">${fmtPct(h.plPct)}</td>
+        <td>
+          <button class="exch-btn dep" style="font-size:11px;padding:4px 10px"
+            onclick="quickSell('${h.symbol}', ${h.shares})">전량 매도</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="8" style="text-align:center;color:#7b869e;padding:20px">보유 종목 없음</td></tr>'
 }
 
-function renderPortfolio() {
-    const u = state.user
-    if (!u.username) {
-        $('#player-tag').textContent = '미로그인'
-        $('#portfolio-summary').innerHTML = '<div class="placeholder">로그인 후 표시됩니다</div>'
-        $('#portfolio-holdings').innerHTML = ''
-        $('#portfolio-history').innerHTML  = ''
-        return
-    }
-
-    if (!u.data) {
-        $('#player-tag').textContent = u.username
-        $('#portfolio-summary').innerHTML = '<div class="placeholder">데이터 로딩 중...</div>'
-        return
-    }
-
-    $('#player-tag').textContent = u.username
-
-    const t = u.data.totals || {}
-    $('#portfolio-summary').innerHTML = `
-        <div class="summary-row"><span class="label">현금</span><span class="value">${fmtMoney(t.cash)} G</span></div>
-        <div class="summary-row"><span class="label">투자원금</span><span class="value">${fmtMoney(t.invested)} G</span></div>
-        <div class="summary-row"><span class="label">평가손익</span><span class="value ${t.pl >= 0 ? 'up' : 'down'}">${fmtPct(t.plPct)}</span></div>
-        <div class="summary-row total"><span class="label">총 자산</span><span class="value">${fmtMoney(t.value)} G</span></div>
-    `
-
-    const holdings = u.data.portfolio || []
-    if (holdings.length === 0) {
-        $('#portfolio-holdings').innerHTML = '<div class="placeholder">보유 종목 없음</div>'
-    } else {
-        $('#portfolio-holdings').innerHTML = holdings.map(h => `
-            <div class="holding">
-                <div class="sym">${h.symbol}</div>
-                <div class="val">${fmtMoney(h.value)} G</div>
-                <div class="meta">${h.shares}주 @${fmtMoney(h.avg)}</div>
-                <div class="pl ${h.pl >= 0 ? 'up' : 'down'}">${fmtPct(h.plPct)}</div>
-            </div>
-        `).join('')
-    }
-
-    const txs = u.data.transactions || []
-    if (txs.length === 0) {
-        $('#portfolio-history').innerHTML = '<div class="placeholder">거래내역 없음</div>'
-    } else {
-        $('#portfolio-history').innerHTML = txs.slice(0, 12).map(tx => `
-            <div class="tx">
-                <span class="time">${fmtTime(tx.at)}</span>
-                <span class="type-${tx.type}">${tx.type === 'buy' ? '매수' : '매도'} ${tx.symbol} ×${tx.shares}</span>
-                <span>${fmtMoney(tx.price)}</span>
-            </div>
-        `).join('')
-    }
+async function quickSell(symbol, shares) {
+  if (!S.user.uuid) return
+  const r = await api('/api/order', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ uuid:S.user.uuid, type:'sell', symbol, shares }),
+  })
+  showOrderFeedback(r.ok, r.message)
 }
 
-// ---------- 이벤트 ----------
-$('#login-btn').addEventListener('click', login)
-$('#username-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') login()
+// =============================================================
+// 거래내역 탭
+// =============================================================
+function renderHistoryTab() {
+  const txs = S.user.data ? (S.user.data.transactions||[]) : []
+  $('hist-tbody').innerHTML = txs.length
+    ? txs.map(tx => `
+      <tr>
+        <td style="color:#7b869e">${fmtDate(tx.at)}</td>
+        <td><span class="${tx.type==='buy'?'badge-buy':'badge-sell'}">${tx.type==='buy'?'매수':'매도'}</span></td>
+        <td><span class="sym-badge">${tx.symbol}</span></td>
+        <td>${tx.shares.toLocaleString()}주</td>
+        <td>${fmtG(tx.price)}</td>
+        <td style="color:#7b869e">${fmtG(tx.fee)}</td>
+        <td>${fmtG(tx.total)}</td>
+        <td class="${tx.profit!=null?plClass(tx.profit):''}">
+          ${tx.profit!=null ? (tx.profit>=0?'+':'')+fmtG(tx.profit) : '--'}
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="8" style="text-align:center;color:#7b869e;padding:20px">거래내역 없음</td></tr>'
+}
+
+// =============================================================
+// 주문
+// =============================================================
+function updateCalc() {
+  const sym = S.selected
+  if (!sym) { ['calc-price','calc-sub','calc-fee','calc-total'].forEach(id => $(id).textContent='--'); return }
+  const price = (S.prices[sym]||{}).current || 0
+  const qty   = parseInt($('qty-input').value) || 0
+  const sub   = price * qty
+  const fee   = sub * FEE_RATE
+  const total = S.orderSide === 'buy' ? sub + fee : sub - fee
+
+  $('calc-price').textContent = fmtG(price)
+  $('calc-sub').textContent   = fmtG(sub)
+  $('calc-fee').textContent   = fmtG(fee)
+  $('calc-total').textContent = fmtG(total)
+
+  const btn = $('order-btn')
+  if (sym && S.user.uuid) {
+    btn.disabled = false
+    btn.textContent = (S.orderSide === 'buy' ? '매수 주문 ' : '매도 주문 ') + sym
+    btn.className   = 'order-btn ' + (S.orderSide === 'buy' ? 'buy-btn' : 'sell-btn')
+  } else if (!S.user.uuid) {
+    btn.disabled    = true
+    btn.textContent = '로그인 필요'
+  }
+}
+
+async function submitOrder() {
+  if (!S.user.uuid || !S.selected) return
+  const qty = parseInt($('qty-input').value) || 0
+  if (qty <= 0) return
+
+  const r = await api('/api/order', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({
+      uuid:   S.user.uuid,
+      type:   S.orderSide,
+      symbol: S.selected,
+      shares: qty,
+    }),
+  })
+  showOrderFeedback(r.ok, r.message)
+  if (r.ok) setTimeout(poll, 1500)
+}
+
+function showOrderFeedback(ok, msg) {
+  const el = $('order-feedback')
+  el.textContent = msg || (ok ? '주문 완료' : '주문 실패')
+  el.className   = 'order-feedback ' + (ok ? 'ok' : 'fail')
+  setTimeout(() => { el.textContent = ''; el.className = 'order-feedback' }, 4000)
+}
+
+// =============================================================
+// 에메랄드 환전
+// =============================================================
+async function deposit() {
+  if (!S.user.uuid) return
+  const qty = parseInt($('dep-qty').value) || 0
+  if (qty <= 0) return
+  const r = await api('/api/deposit', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ uuid:S.user.uuid, emeralds:qty }),
+  })
+  showExchMsg(r.ok, r.message)
+  if (r.ok) setTimeout(poll, 1000)
+}
+async function withdraw() {
+  if (!S.user.uuid) return
+  const qty = parseInt($('with-qty').value) || 0
+  if (qty <= 0) return
+  const r = await api('/api/withdraw', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ uuid:S.user.uuid, emeralds:qty }),
+  })
+  showExchMsg(r.ok, r.message)
+  if (r.ok) setTimeout(poll, 1000)
+}
+function showExchMsg(ok, msg) {
+  const el = $('exch-msg')
+  el.textContent = msg
+  el.className   = 'exch-msg ' + (ok ? 'ok' : 'fail')
+  setTimeout(() => { el.textContent=''; el.className='exch-msg' }, 4000)
+}
+
+// =============================================================
+// 티커
+// =============================================================
+function renderTicker() {
+  const stocks = S.meta.stocks || []
+  $('ticker-inner').innerHTML = [...stocks, ...stocks].map(s => {
+    const p = S.prices[s.symbol] || {}
+    const c = (p.change||0) >= 0
+    return `<div class="ticker-item">
+      <span class="ti-sym">${s.symbol}</span>
+      <span class="ti-price">${fmtG(p.current||0)}</span>
+      <span class="ti-chg ${c?'up':'down'}">${fmtPct(p.change||0)}</span>
+    </div>`
+  }).join('')
+}
+
+// =============================================================
+// 관리자 페이지
+// =============================================================
+async function renderAdminPage() {
+  if (!S.user.isOp) return
+
+  // 종목 테이블
+  const state = await api('/api/state')
+  if (!state || !state.ok) return
+  const stocks = state.meta.stocks || []
+  const prices = state.prices || {}
+
+  $('admin-stock-tbody').innerHTML = stocks.map(s => `
+    <tr>
+      <td><span class="sym-badge">${s.symbol}</span></td>
+      <td>${s.name}</td>
+      <td>${s.sector}</td>
+      <td>${fmtG(s.basePrice)}</td>
+      <td>${(s.volatility*100).toFixed(0)}%</td>
+      <td>${s.trend >= 0 ? '+' : ''}${(s.trend*100).toFixed(1)}%</td>
+      <td class="${plClass((prices[s.symbol]||{}).change)}">${fmtG((prices[s.symbol]||{}).current)}</td>
+      <td>
+        <button class="del-btn" onclick="deleteStock('${s.symbol}')">삭제</button>
+      </td>
+    </tr>`).join('')
+
+  // 플레이어 목록
+  const allPlayers = state.players || []
+  $('admin-player-tbody').innerHTML = allPlayers.map(p => `
+    <tr>
+      <td>${p.username}</td>
+      <td>${fmtG(p.balance)}</td>
+      <td>${p.portfolioCount}</td>
+      <td>${p.txCount}</td>
+    </tr>`).join('')
+}
+
+async function addStock() {
+  const symbol = $('ad-symbol').value.trim().toUpperCase()
+  const name   = $('ad-name').value.trim()
+  const sector = $('ad-sector').value
+  const price  = parseFloat($('ad-price').value)
+  const vol    = parseFloat($('ad-vol').value)
+  const trend  = parseFloat($('ad-trend').value)
+
+  if (!symbol || !name || !price || !vol) {
+    showAdminMsg(false, '모든 필드를 입력해주세요')
+    return
+  }
+
+  const r = await api('/api/admin/stock', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ uuid:S.user.uuid, symbol, name, sector, basePrice:price, volatility:vol, trend }),
+  })
+  showAdminMsg(r.ok, r.message)
+  if (r.ok) {
+    renderAdminPage()
+    $('ad-symbol').value = $('ad-name').value = $('ad-price').value = $('ad-vol').value = $('ad-trend').value = ''
+  }
+}
+
+async function deleteStock(symbol) {
+  if (!confirm(`'${symbol}' 종목을 정말 삭제하시겠습니까?`)) return
+  const r = await api('/api/admin/stock/' + encodeURIComponent(symbol), {
+    method:'DELETE', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ uuid:S.user.uuid }),
+  })
+  showAdminMsg(r.ok, r.message)
+  if (r.ok) renderAdminPage()
+}
+
+function showAdminMsg(ok, msg) {
+  const el = $('admin-msg')
+  el.textContent = msg
+  el.className   = 'admin-msg ' + (ok ? 'ok' : 'fail')
+  setTimeout(() => { el.textContent=''; el.className='admin-msg' }, 4000)
+}
+
+// =============================================================
+// 탭 전환
+// =============================================================
+function switchView(view) {
+  $$('.view').forEach(el => el.classList.remove('active'))
+  $$('.nav-tab').forEach(el => el.classList.remove('active'))
+  $('view-' + view).classList.add('active')
+  document.querySelector(`.nav-tab[data-view="${view}"]`).classList.add('active')
+  if (view === 'admin') renderAdminPage()
+}
+
+// =============================================================
+// 이벤트 바인딩
+// =============================================================
+$$('.nav-tab').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)))
+$$('.chip').forEach(btn => btn.addEventListener('click', () => {
+  $$('.chip').forEach(b => b.classList.remove('on'))
+  btn.classList.add('on')
+  S.sectorFilter = btn.dataset.sector
+  renderStockList()
+}))
+$('search-input').addEventListener('input', e => {
+  S.searchQuery = e.target.value.trim()
+  renderStockList()
 })
+$('ot-buy').addEventListener('click',  () => { S.orderSide='buy';  $('ot-buy').classList.add('active'); $('ot-sell').classList.remove('active'); updateCalc() })
+$('ot-sell').addEventListener('click', () => { S.orderSide='sell'; $('ot-sell').classList.add('active'); $('ot-buy').classList.remove('active'); updateCalc() })
+$('qty-input').addEventListener('input', updateCalc)
+$('btn-minus').addEventListener('click', () => { const v=parseInt($('qty-input').value)||1; if(v>1) { $('qty-input').value=v-1; updateCalc() } })
+$('btn-plus').addEventListener('click',  () => { $('qty-input').value=(parseInt($('qty-input').value)||1)+1; updateCalc() })
+$('order-btn').addEventListener('click', submitOrder)
+$('dep-btn').addEventListener('click',  deposit)
+$('with-btn').addEventListener('click', withdraw)
+$('ad-add-btn').addEventListener('click', addStock)
 
-async function login() {
-    const name = $('#username-input').value.trim()
-    if (!name) return
-    state.user.username = name
-    $('#player-tag').textContent = name + ' (로딩...)'
-    await refreshPlayer()
-    renderPortfolio()
-    renderTradePanel()
-}
+// 시계
+setInterval(() => {
+  $('nav-clock').textContent = new Date().toLocaleTimeString('ko-KR',{hour12:false})
+}, 1000)
 
-async function refreshPlayer() {
-    if (!state.user.username) return
-    const r = await fetchPlayer(state.user.username)
-    if (!r.ok) {
-        state.user.data = null
-        $('#portfolio-summary').innerHTML = `<div class="placeholder">${r.message || '플레이어 데이터를 찾을 수 없습니다.<br>인게임에 1회 접속한 후 다시 시도해주세요.'}</div>`
-        return
-    }
-    state.user.uuid = r.uuid
-    state.user.data = r
-    renderPortfolio()
-}
-
-$('#trade-qty').addEventListener('input', updateEstimate)
-
-$('#buy-btn').addEventListener('click', () => placeOrder('buy'))
-$('#sell-btn').addEventListener('click', () => placeOrder('sell'))
-
-async function placeOrder(type) {
-    const sym = state.selected
-    const qty = parseInt($('#trade-qty').value) || 0
-    if (!sym || qty <= 0) return
-
-    const msgEl = $('#trade-message')
-    msgEl.className = 'trade-message'
-    msgEl.textContent = '주문 전송 중...'
-
-    const r = await submitOrder(type, sym, qty)
-    msgEl.className = 'trade-message ' + (r.ok ? 'success' : 'error')
-    msgEl.textContent = r.message || (r.ok ? '주문 완료' : '주문 실패')
-
-    if (r.ok) {
-        // 약간의 지연 후 플레이어 데이터 갱신 (KubeJS 가 처리할 시간)
-        setTimeout(refreshPlayer, 1500)
-        setTimeout(refreshPlayer, 6000)
-    }
-}
-
-// 섹터 필터
-$$('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        $$('.filter-btn').forEach(b => b.classList.remove('active'))
-        btn.classList.add('active')
-        state.sectorFilter = btn.dataset.sector
-        renderStocksList()
-    })
-})
-
-// ---------- 시계 ----------
-function tickClock() {
-    $('#clock').textContent = new Date().toLocaleTimeString('ko-KR', { hour12: false })
-}
-setInterval(tickClock, 1000); tickClock()
-
-// ---------- 메인 폴링 루프 ----------
-async function poll() {
-    const data = await fetchState()
-    if (data) {
-        state.lastPrices = Object.fromEntries(
-            Object.entries(state.prices).map(([k, v]) => [k, v.current])
-        )
-        state.prices = data.prices
-        state.meta   = data.meta
-        $('#last-update').textContent = fmtTime(data.lastUpdate)
-
-        renderStocksList()
-        renderTicker()
-        if (state.selected) renderChart()
-        if (state.user.username) {
-            // 매 폴링마다 플레이어 데이터도 갱신
-            refreshPlayer()
-        }
-        updateEstimate()
-    }
-}
-
+// =============================================================
 // 시작
-fetchInfo()
-poll()
-setInterval(poll, POLL_MS)
+// =============================================================
+;(async () => {
+  await autoLogin()
+  await poll()
+  setInterval(poll, POLL_MS)
+})()

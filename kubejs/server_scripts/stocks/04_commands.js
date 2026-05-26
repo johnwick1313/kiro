@@ -11,21 +11,22 @@ function colorChange(p) { return p >= 0 ? 'green' : 'red' }
 function pad(s, n) { s = String(s); while (s.length < n) s += ' '; return s }
 
 function sendWebLink(player) {
-    const url = 'http://localhost:3000'
+    // UUID를 URL 파라미터에 포함 → 자동 로그인
+    const uuid = player.stringUuid
+    const url  = 'http://localhost:3000/?uuid=' + uuid
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
-    player.tell(Text.of('  📈 선릿밸리 주식 거래소 웹 대시보드').color('yellow').bold(true))
+    player.tell(Text.of('  📈 선릿밸리 주식 거래소').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(
         Text.of('  ▶ ').color('green')
             .append(
-                Text.of('[ 클릭해서 대시보드 열기 ]')
+                Text.of('[ 대시보드 열기 - 자동 로그인 ]')
                     .color('aqua')
                     .underlined(true)
                     .click({ type: 'open_url', value: url })
-                    .hover({ type: 'text', value: Text.of(url).color('white') })
+                    .hover({ type: 'text', value: Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white') })
             )
     )
-    player.tell(Text.of('  주소: ' + url).color('gray'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 
