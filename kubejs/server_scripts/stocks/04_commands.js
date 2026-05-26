@@ -10,6 +10,25 @@ function fmtPct(p) {
 function colorChange(p) { return p >= 0 ? 'green' : 'red' }
 function pad(s, n) { s = String(s); while (s.length < n) s += ' '; return s }
 
+function sendWebLink(player) {
+    const url = 'http://localhost:3000'
+    player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+    player.tell(Text.of('  📈 선릿밸리 주식 거래소 웹 대시보드').color('yellow').bold(true))
+    player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+    player.tell(
+        Text.of('  ▶ ').color('green')
+            .append(
+                Text.of('[ 클릭해서 대시보드 열기 ]')
+                    .color('aqua')
+                    .underlined(true)
+                    .click({ type: 'open_url', value: url })
+                    .hover({ type: 'text', value: Text.of(url).color('white') })
+            )
+    )
+    player.tell(Text.of('  주소: ' + url).color('gray'))
+    player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+}
+
 function sendHelp(player) {
     player.tell(Text.of('━━━━━━━━━━ 주식 시스템 도움말 ━━━━━━━━━━').color('gold'))
     player.tell(Text.of('!주식 목록            ').color('aqua').append(Text.white('- 모든 종목 시세 조회')))
@@ -21,6 +40,7 @@ function sendHelp(player) {
     player.tell(Text.of('!주식 충전 [에메랄드수]').color('aqua').append(Text.white(' - 에메랄드 -> 골드 환전')))
     player.tell(Text.of('!주식 출금 [수량]     ').color('aqua').append(Text.white('- 골드 -> 에메랄드 환전')))
     player.tell(Text.of('!주식 거래내역        ').color('aqua').append(Text.white('- 최근 거래 10건')))
+    player.tell(Text.of('!주식 웹              ').color('aqua').append(Text.white('- 웹 대시보드 링크 열기')))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 
@@ -174,6 +194,8 @@ PlayerEvents.chat(event => {
     let dirty = false
 
     switch (cmd) {
+        case '웹': case 'web': case 'gui':
+            sendWebLink(player); break
         case '도움말': case 'help': case '?':
             sendHelp(player); break
         case '목록': case 'list': case 'ls':

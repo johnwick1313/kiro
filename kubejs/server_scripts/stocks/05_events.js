@@ -60,6 +60,14 @@ PlayerEvents.loggedIn(event => {
         .append(Text.white(playerData.balance.toFixed(2) + ' G')))
     event.player.tell(Text.of('명령어 도움말: ').color('aqua')
         .append(Text.yellow('!주식 도움말')))
-    event.player.tell(Text.of('웹 대시보드: ').color('aqua')
-        .append(Text.aqua('http://localhost:3000')))
+    event.player.tell(
+        Text.of('웹 대시보드: ').color('aqua')
+            .append(
+                Text.of('[ 클릭해서 열기 → localhost:3000 ]')
+                    .color('green')
+                    .underlined(true)
+                    .click({ type: 'open_url', value: 'http://localhost:3000' })
+                    .hover({ type: 'text', value: Text.of('브라우저에서 주식 대시보드를 엽니다').color('white') })
+            )
+    )
 })
