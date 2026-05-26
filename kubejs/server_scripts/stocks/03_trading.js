@@ -20,7 +20,7 @@ global.executeBuy = function (data, playerData, symbol, shares) {
     const total = gross + fee
 
     if (playerData.balance < total) {
-        result.message = `잔고가 부족합니다. 필요: ${total.toFixed(2)} G / 보유: ${playerData.balance.toFixed(2)} G`
+        result.message = '잔고가 부족합니다. 필요: ' + total.toFixed(2) + ' G / 보유: ' + playerData.balance.toFixed(2) + ' G'
         return result
     }
 
@@ -36,13 +36,13 @@ global.executeBuy = function (data, playerData, symbol, shares) {
 
     const tx = {
         type: 'buy', symbol: stock.symbol, name: stock.name,
-        shares, price, fee, total, at: Date.now(),
+        shares: shares, price: price, fee: fee, total: total, at: Date.now()
     }
     global.appendTransaction(playerData, tx)
     global.appendAudit(Object.assign({ player: playerData.username }, tx))
 
     result.ok = true
-    result.message = `[매수 체결] ${stock.name} ${shares}주 @ ${price.toFixed(2)} G (수수료 ${fee.toFixed(2)})`
+    result.message = '[매수 체결] ' + stock.name + ' ' + shares + '주 @ ' + price.toFixed(2) + ' G (수수료 ' + fee.toFixed(2) + ')'
     result.tx = tx
     return result
 }
@@ -58,7 +58,7 @@ global.executeSell = function (data, playerData, symbol, shares) {
 
     const owned = playerData.portfolio[stock.symbol] || 0
     if (shares > owned) {
-        result.message = `보유 수량이 부족합니다. 보유: ${owned}주`
+        result.message = '보유 수량이 부족합니다. 보유: ' + owned + '주'
         return result
     }
 
@@ -81,14 +81,14 @@ global.executeSell = function (data, playerData, symbol, shares) {
 
     const tx = {
         type: 'sell', symbol: stock.symbol, name: stock.name,
-        shares, price, fee, total: net, profit, at: Date.now(),
+        shares: shares, price: price, fee: fee, total: net, profit: profit, at: Date.now()
     }
     global.appendTransaction(playerData, tx)
     global.appendAudit(Object.assign({ player: playerData.username }, tx))
 
     result.ok = true
     const sign = profit >= 0 ? '+' : ''
-    result.message = `[매도 체결] ${stock.name} ${shares}주 @ ${price.toFixed(2)} G (손익 ${sign}${profit.toFixed(2)} G)`
+    result.message = '[매도 체결] ' + stock.name + ' ' + shares + '주 @ ' + price.toFixed(2) + ' G (손익 ' + sign + profit.toFixed(2) + ' G)'
     result.tx = tx
     return result
 }

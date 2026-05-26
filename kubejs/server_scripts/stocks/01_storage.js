@@ -6,8 +6,8 @@
 // JsonIO 로 안전하게 읽기 (없으면 null)
 global.readJsonSafe = function (path) {
     try {
-        const data = JsonIO.read(path)
-        return data || null
+        var d = JsonIO.read(path)
+        return d || null
     } catch (e) {
         return null
     }
@@ -15,7 +15,7 @@ global.readJsonSafe = function (path) {
 
 // 주식 시스템 전체 상태 가져오기
 global.getStockData = function () {
-    let data = global.readJsonSafe(global.STOCK_CONFIG.exportPath)
+    var data = global.readJsonSafe(global.STOCK_CONFIG.exportPath)
     if (!data || typeof data !== 'object') {
         data = { prices: {}, players: {}, lastUpdate: 0, meta: {} }
     }
@@ -23,14 +23,14 @@ global.getStockData = function () {
     if (!data.players) data.players = {}
     if (!data.meta)    data.meta    = {}
 
-    // 종목 메타데이터 동기화 (이름, 섹터 등 GUI 에서 사용)
-    data.meta.stocks = global.STOCKS.map(s => ({
-        symbol: s.symbol, name: s.name, sector: s.sector, basePrice: s.basePrice
-    }))
+    // 종목 메타데이터 동기화
+    data.meta.stocks = global.STOCKS.map(function(s) {
+        return { symbol: s.symbol, name: s.name, sector: s.sector, basePrice: s.basePrice, volatility: s.volatility, trend: s.trend }
+    })
     data.meta.config = {
         updateIntervalTicks: global.STOCK_CONFIG.updateIntervalTicks,
         tradeFee: global.STOCK_CONFIG.tradeFee,
-        currency: 'GOLD',
+        currency: 'GOLD'
     }
 
     return data
@@ -48,10 +48,10 @@ global.getPlayerData = function (data, uuid, username) {
         data.players[uuid] = {
             username: username || 'Unknown',
             balance: global.STOCK_CONFIG.startingBalance,
-            portfolio: {},          // { SYMBOL: shares }
-            avgCost:   {},          // { SYMBOL: 평단가 }
+            portfolio: {},
+            avgCost:   {},
             transactions: [],
-            joinedAt: Date.now(),
+            joinedAt: Date.now()
         }
     }
     if (username) data.players[uuid].username = username
@@ -68,7 +68,7 @@ global.appendTransaction = function (playerData, tx) {
 
 // 감사 로그 (전체 거래 기록, 최근 500건 유지)
 global.appendAudit = function (entry) {
-    let audit = global.readJsonSafe(global.STOCK_CONFIG.auditPath) || { logs: [] }
+    var audit = global.readJsonSafe(global.STOCK_CONFIG.auditPath) || { logs: [] }
     if (!audit.logs) audit.logs = []
     audit.logs.unshift(entry)
     if (audit.logs.length > 500) audit.logs.length = 500

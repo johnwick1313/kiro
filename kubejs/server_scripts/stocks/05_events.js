@@ -6,11 +6,10 @@
 // 커스텀 종목 불러오기 (웹 관리자 페이지에서 추가된 종목)
 global.loadCustomStocks = function () {
     try {
-        const custom = global.readJsonSafe(global.STOCK_CONFIG.customStocksPath)
-        if (!custom || !Array.isArray(custom.stocks)) return
-        custom.stocks.forEach(s => {
-            // 중복 심볼이 없을 때만 추가
-            if (!global.STOCKS.find(x => x.symbol === s.symbol)) {
+        var customData = global.readJsonSafe(global.STOCK_CONFIG.customStocksPath)
+        if (!customData || !Array.isArray(customData.stocks)) return
+        customData.stocks.forEach(function(s) {
+            if (!global.STOCKS.find(function(x) { return x.symbol === s.symbol })) {
                 global.STOCKS.push(s)
                 console.info('[StockSystem] 커스텀 종목 로드: ' + s.symbol + ' (' + s.name + ')')
             }
@@ -23,10 +22,9 @@ global.loadCustomStocks = function () {
 // OP 목록을 exports 에 동기화 (웹 서버가 읽을 수 있도록)
 global.syncOps = function (server) {
     try {
-        const opUuids = []
-        server.playerList.players.forEach(p => {
+        var opUuids = []
+        server.playerList.players.forEach(function(p) {
             try {
-                // hasPermissions(4) = OP 레벨 4
                 if (p.hasPermissions(4)) {
                     opUuids.push(p.stringUuid)
                 }
@@ -38,16 +36,33 @@ global.syncOps = function (server) {
     }
 }
 
+// exports 폴더 보장 (없으면 초기 파일 생성)
+global.ensureExportsDir = function () {
+    try {
+        // stocks_state.json 이 없으면 빈 구조로 생성
+        var existing = global.readJsonSafe(global.STOCK_CONFIG.exportPath)
+        if (!existing) {
+            JsonIO.write(global.STOCK_CONFIG.exportPath, { prices: {}, players: {}, lastUpdate: 0, meta: {} })
+        }
+        var existingOrders = global.readJsonSafe(global.STOCK_CONFIG.ordersPath)
+        if (!existingOrders) {
+            JsonIO.write(global.STOCK_CONFIG.ordersPath, { orders: [] })
+        }
+    } catch (e) {
+        console.error('[StockSystem] exports 초기화 오류: ' + e)
+    }
+}
+
 // 서버 시작 시 초기화
-ServerEvents.loaded(event => {
+ServerEvents.loaded(function(event) {
     console.info('[StockSystem] 서버 로드. 커스텀 종목 불러오는 중...')
 
-    // 커스텀 종목 먼저 로드
+    global.ensureExportsDir()
     global.loadCustomStocks()
 
-    const data = global.getStockData()
+    var data = global.getStockData()
 
-    global.STOCKS.forEach(stock => {
+    global.STOCKS.forEach(function(stock) {
         if (!data.prices[stock.symbol]) {
             data.prices[stock.symbol] = {
                 current: stock.basePrice,
@@ -55,7 +70,7 @@ ServerEvents.loaded(event => {
                 high:    stock.basePrice,
                 low:     stock.basePrice,
                 history: [{ t: Date.now(), p: stock.basePrice }],
-                change:  0,
+                change:  0
             }
         }
     })
@@ -65,9 +80,9 @@ ServerEvents.loaded(event => {
 })
 
 // 틱 이벤트 - N틱마다 가격 갱신 + 웹 주문 처리
-let _stockTickCounter  = 0
-let _customCheckCounter = 0
-ServerEvents.tick(event => {
+var _stockTickCounter  = 0
+var _customCheckCounter = 0
+ServerEvents.tick(function(event) {
     _stockTickCounter++
     _customCheckCounter++
 
@@ -89,23 +104,21 @@ ServerEvents.tick(event => {
 })
 
 // 로그인: 환영 메시지 + OP 동기화
-PlayerEvents.loggedIn(event => {
-    const player     = event.player
-    const uuid       = player.stringUuid
-    const username   = player.username || player.name.string
-    const data       = global.getStockData()
-    const playerData = global.getPlayerData(data, uuid, username)
+PlayerEvents.loggedIn(function(event) {
+    var player   = event.player
+    var uuid     = player.stringUuid
+    var username = player.username || player.name.string
+    var data     = global.getStockData()
+    var playerData = global.getPlayerData(data, uuid, username)
     global.saveStockData(data)
 
-    // OP 목록 갱신
     try { global.syncOps(player.server) } catch (e) {}
 
-    const webUrl = 'http://localhost:3000/?uuid=' + uuid
-    const isOp   = player.hasPermissions(4)
+    var webUrl = 'http://localhost:3000/?uuid=' + uuid
+    var isOp   = player.hasPermissions(4)
 
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
-    player.tell(Text.of('  📈 Sunlit Exchange').color('yellow').bold(true)
-        .append(isOp ? Text.of('  [OP]').color('gold') : Text.empty()))
+    player.tell(Text.of('  📈 Sunlit Exchange').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('잔고: ').color('gray')
         .append(Text.of(playerData.balance.toFixed(2) + ' G').color('white').bold(true)))
