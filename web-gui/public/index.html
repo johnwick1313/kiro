@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>선릿밸리 주식 거래소 :: SUNLIT EXCHANGE</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="grid-bg"></div>
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="logo-icon">$</span>
+            <span class="logo-text">SUNLIT<span class="accent">EXCHANGE</span></span>
+            <span class="logo-sub">v1.0</span>
+        </div>
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="label">시간</span>
+                <span class="value" id="clock">--:--:--</span>
+            </div>
+            <div class="status-item">
+                <span class="label">시세 업데이트</span>
+                <span class="value" id="last-update">--</span>
+            </div>
+            <div class="status-item">
+                <span class="label">연결</span>
+                <span class="value" id="conn-status">
+                    <span class="dot offline"></span>
+                    <span id="conn-text">접속 중...</span>
+                </span>
+            </div>
+        </div>
+        <div class="login-bar">
+            <input type="text" id="username-input" placeholder="플레이어명 입력" autocomplete="off">
+            <button id="login-btn">로그인</button>
+        </div>
+    </header>
+
+    <main class="layout">
+        <!-- 좌측: 종목 리스트 -->
+        <section class="panel stocks-panel">
+            <header class="panel-header">
+                <h2>실시간 시세</h2>
+                <div class="filter-bar">
+                    <button class="filter-btn active" data-sector="ALL">전체</button>
+                    <button class="filter-btn" data-sector="농업">농업</button>
+                    <button class="filter-btn" data-sector="축산업">축산</button>
+                    <button class="filter-btn" data-sector="수산업">수산</button>
+                    <button class="filter-btn" data-sector="임업">임업</button>
+                    <button class="filter-btn" data-sector="광업">광업</button>
+                    <button class="filter-btn" data-sector="마법">마법</button>
+                </div>
+            </header>
+            <div class="stocks-list" id="stocks-list">
+                <div class="placeholder">데이터 로딩 중...</div>
+            </div>
+        </section>
+
+        <!-- 중앙: 차트 + 거래 -->
+        <section class="panel chart-panel">
+            <header class="panel-header">
+                <h2 id="chart-title">종목을 선택하세요</h2>
+                <div class="chart-meta" id="chart-meta"></div>
+            </header>
+            <div class="chart-wrapper">
+                <canvas id="price-chart"></canvas>
+            </div>
+            <div class="trade-panel" id="trade-panel">
+                <div class="trade-row">
+                    <label>수량</label>
+                    <input type="number" id="trade-qty" min="1" value="1">
+                    <span class="estimate" id="trade-estimate">예상: --</span>
+                </div>
+                <div class="trade-buttons">
+                    <button class="btn-buy"  id="buy-btn"  disabled>매수</button>
+                    <button class="btn-sell" id="sell-btn" disabled>매도</button>
+                </div>
+                <div class="trade-message" id="trade-message"></div>
+            </div>
+        </section>
+
+        <!-- 우측: 포트폴리오 -->
+        <section class="panel portfolio-panel">
+            <header class="panel-header">
+                <h2>포트폴리오</h2>
+                <span class="player-tag" id="player-tag">미로그인</span>
+            </header>
+            <div class="portfolio-summary" id="portfolio-summary">
+                <div class="placeholder">로그인 후 표시됩니다</div>
+            </div>
+            <div class="portfolio-holdings" id="portfolio-holdings"></div>
+            <header class="panel-header sub">
+                <h3>최근 거래</h3>
+            </header>
+            <div class="portfolio-history" id="portfolio-history"></div>
+        </section>
+    </main>
+
+    <footer class="bottombar">
+        <span>KubeJS Bridge</span>
+        <span id="bridge-info">--</span>
+        <span class="ticker" id="ticker"></span>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
