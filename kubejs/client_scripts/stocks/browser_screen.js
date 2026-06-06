@@ -67,7 +67,8 @@ function openUrl(url) {
     }
 }
 
-// 라이브 서버 대시보드 (Node 브릿지 서버 필요, 매수/매도 가능)
+// 라이브 대시보드 (전체 기능: 매수/매도/관리자)
+// 마크 내장 HTTP 서버(07_http_server.js) 또는 Node 서버로 동작
 global.openStockBrowser = function(uuid) {
     openUrl(uuid ? (BASE_URL + '?uuid=' + uuid) : BASE_URL)
 }

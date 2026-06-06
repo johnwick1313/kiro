@@ -101,6 +101,15 @@ global.STOCK_CONFIG = {
     offlineDashboardEnabled: true,
     offlineDashboardPath: 'kubejs/exports/dashboard.html',
 
+    // ── 임베디드 HTTP 서버 (마크 JVM 내장, 별도 Node 서버 불필요) ──
+    // KubeJS 가 마인크래프트 안에서 직접 작은 웹 서버를 띄웁니다.
+    // 매수/매도/관리자까지 전체 기능을 Node 없이 사용할 수 있습니다.
+    // (JDK 의 com.sun.net.httpserver 사용. 일부 최소화된 런타임엔 없을 수 있음)
+    httpServerEnabled: true,
+    httpServerPort: 3000,           // MCEF/브라우저가 접속할 포트 (Node 서버와 동일)
+    httpServerHost: '0.0.0.0',      // 0.0.0.0 = 로컬 + LAN 모두 허용
+    httpWebRoot: 'kubejs/web',      // 정적 웹 자산 폴더 (index.html 등)
+
     // 차트용 가격 히스토리 보관 길이
     historyLength: 60,
 

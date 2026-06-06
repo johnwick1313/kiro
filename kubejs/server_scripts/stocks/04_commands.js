@@ -27,6 +27,7 @@ function sendWebLink(player) {
                     .hover({ type: 'text', value: Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white') })
             )
     )
+    player.tell(Text.gray('마크 내장 서버로 동작합니다 (별도 Node 서버 불필요). 인게임은 K 키.'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 

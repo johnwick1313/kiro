@@ -3,12 +3,14 @@
 선릿밸리 모드팩에서 작동하는 **KubeJS 기반 인게임 주식 거래 시스템** + **웹 GUI 대시보드** 입니다.
 
 ```
-+-------------------------+        +------------------------+        +----------------------+
-|  Minecraft + KubeJS     |  JSON  |  Node.js 브릿지 서버    |  HTTP  |  웹 브라우저 대시보드  |
-|  · 가격 시뮬레이션      | <----> |  · 파일 IO              | <----> |  · 차트, 매수/매도   |
-|  · 매수/매도 명령어      |        |  · /api/state, /order  |        |  · 사이버펑크 UI     |
-|  · 채팅 명령어 (!주식)   |        +------------------------+        +----------------------+
-+-------------------------+
+                                  ┌─ ① 마크 내장 HTTP 서버 (Node 불필요, 전체 기능)
+                                  │     KubeJS 가 JVM 안에서 직접 서빙 → localhost:3000
++-------------------------+  JSON │
+|  Minecraft + KubeJS     | <─────┼─ ② Node.js 브릿지 서버 → 웹 브라우저
+|  · 가격 시뮬레이션      |  파일  │     web-gui (Express)
+|  · 매수/매도, 채팅명령   |       │
+|  · 화폐 연동 (Lightman) |       └─ ③ 오프라인 HTML 파일 (읽기전용, 의존성 0)
++-------------------------+             kubejs/exports/dashboard.html
 ```
 
 ## 기능
@@ -30,11 +32,18 @@
 - 웹에서 매수/매도 주문 (KubeJS 가 다음 틱에 체결)
 - **한국 주식앱 스타일 UI** — 라이트 테마 기본 + 다크 테마 토글 (상승=빨강 / 하락=파랑)
 
-### 오프라인 모드 (Node 서버 불필요)
-- KubeJS 가 매 갱신마다 **데이터가 내장된 자가완결형 HTML 파일**(`kubejs/exports/dashboard.html`)을 생성
-- 외부 의존성 0 (Chart.js CDN 대신 인라인 SVG 스파크라인, 인터넷 불필요)
-- MCEF 또는 일반 브라우저에서 `file://` 로 바로 열기 (8초마다 자동 새로고침, 읽기 전용)
-- 인게임 **J 키** 또는 `!주식 오프라인` 명령어로 열기 (라이브 서버 대시보드는 **K 키**)
+### 실행 방식 3가지 (원하는 것 선택)
+
+| 방식 | Node 필요? | 매수/매도 | 인터넷 | 여는 법 |
+|------|:--:|:--:|:--:|------|
+| **① 마크 내장 서버** (권장) | ❌ | ✅ | ❌ | K 키 / `!주식 웹` |
+| ② Node 브릿지 서버 | ✅ | ✅ | ❌\* | `localhost:3000` |
+| ③ 오프라인 HTML 파일 | ❌ | ❌(읽기전용) | ❌ | J 키 / `!주식 오프라인` |
+
+> \* Chart.js 를 로컬 번들(`kubejs/web/vendor`)로 포함해 ①·③ 은 인터넷 없이도 차트가 표시됩니다. ② Node 서버는 `web-gui/public` 의 CDN 버전을 사용합니다.
+
+- **① 마크 내장 서버**: KubeJS 가 마인크래프트 JVM 안에서 직접 웹 서버를 띄웁니다. **별도 Node 프로세스 없이** 매수/매도·관리자까지 전체 GUI 를 사용할 수 있습니다. (JDK 내장 `com.sun.net.httpserver` 사용)
+- **③ 오프라인 HTML 파일**: 데이터가 통째로 내장된 단일 HTML 을 매 갱신마다 생성. 인라인 SVG 스파크라인으로 의존성 0, 8초 자동 새로고침. 읽기 전용.
 
 ---
 
@@ -50,16 +59,23 @@
     ├── server_scripts/
     │   └── stocks/                   <-- 이 저장소의 kubejs/server_scripts/stocks/ 복사
     │       ├── 00_config.js
+    │       ├── 00b_currency.js
     │       ├── 01_storage.js
     │       ├── 02_engine.js
     │       ├── 03_trading.js
     │       ├── 04_commands.js
-    │       └── 05_events.js
+    │       ├── 05_events.js
+    │       ├── 06_offline_dashboard.js
+    │       └── 07_http_server.js
+    ├── client_scripts/
+    │   └── stocks/                   <-- K/J 키, MCEF 브라우저
+    ├── web/                          <-- 내장 서버용 정적 자산 (그대로 복사)
     └── exports/                      <-- 자동 생성됨
         ├── stocks_state.json
         ├── stocks_orders.json
         ├── stocks_responses.json
-        └── stocks_audit.json
+        ├── stocks_audit.json
+        └── dashboard.html            <-- 오프라인 대시보드 (자동 생성)
 ```
 
 **모드팩 실행 방법**
@@ -70,9 +86,21 @@
 
 > 만약 스크립트가 적용되지 않는다면 인게임에서 `/kubejs reload server_scripts` 명령어로 리로드하세요.
 
-### 2. 웹 대시보드 실행
+### 2. 웹 대시보드 열기
 
-> **요구사항**: Node.js 18 이상
+설치는 KubeJS 스크립트 복사만으로 끝납니다. **마크 내장 서버가 기본 활성화**되어 있어 별도 설치 없이 바로 쓸 수 있습니다.
+
+**방식 ① — 마크 내장 서버 (권장, Node 불필요)**
+1. 월드 진입 후 콘솔에서 `[StockHttp] ✔ 임베디드 웹 서버 시작: http://localhost:3000` 확인
+2. 인게임에서 **K 키** 를 누르거나 `!주식 웹` 클릭 → MCEF 브라우저로 열림
+3. 외부 브라우저로 보려면 `http://localhost:3000` 접속 (싱글플레이/LAN 호스트 기준)
+
+> 끄려면 `00_config.js` 의 `httpServerEnabled: false`. 포트는 `httpServerPort` 로 변경.
+> 일부 최소화된 자바 런타임엔 `com.sun.net.httpserver` 모듈이 없을 수 있는데, 그 경우 자동으로 비활성화되고 콘솔에 안내가 출력됩니다 (방식 ②/③ 사용).
+
+**방식 ② — Node 브릿지 서버** (선택, `web-gui` 별도 실행)
+
+> 요구사항: Node.js 18 이상
 
 ```bash
 cd web-gui
@@ -80,17 +108,9 @@ npm install
 KUBEJS_PATH="<모드팩 인스턴스>/kubejs" npm start
 ```
 
-또는 환경변수 없이 실행하려면 `web-gui/`와 `kubejs/`를 같은 부모 디렉토리에 두세요 (기본 경로: `../kubejs`).
+또는 환경변수 없이 실행하려면 `web-gui/`와 `kubejs/`를 같은 부모 디렉토리에 두세요 (기본 경로: `../kubejs`). 브라우저에서 **http://localhost:3000** 접속.
 
-**Windows PowerShell 예시**
-```powershell
-cd web-gui
-npm install
-$env:KUBEJS_PATH = "C:\Users\YourName\curseforge\minecraft\Instances\Sunlit Valley\kubejs"
-npm start
-```
-
-브라우저에서 **http://localhost:3000** 접속.
+**방식 ③ — 오프라인 HTML 파일** (읽기 전용): 인게임 **J 키** 또는 `kubejs/exports/dashboard.html` 더블클릭.
 
 ---
 
@@ -133,12 +153,13 @@ npm start
 신규 플레이어는 **1000 G** 로 시작합니다. 거래 수수료는 **0.5%**.
 
 ### 웹 대시보드 사용
-1. 브라우저에서 http://localhost:3000 접속
-2. 우측 상단 입력창에 **마인크래프트 닉네임** 입력 후 [로그인]
-   - (먼저 인게임에 1회 접속해야 데이터가 생성됩니다)
-3. 좌측에서 종목 클릭 → 중앙에 차트 표시
-4. 수량 입력 후 [매수] 또는 [매도] 클릭
-5. 최대 10초 후 (다음 틱) 체결 → 인게임 채팅에도 결과 표시
+1. 인게임에서 **K 키** 를 누르거나 `!주식 웹` 링크 클릭 → 자동 로그인된 대시보드가 열림
+   - (외부 브라우저는 `http://localhost:3000/?uuid=<본인UUID>` 로 접속)
+   - 먼저 인게임에 1회 접속해야 계좌 데이터가 생성됩니다
+2. 좌측에서 종목 클릭 → 중앙에 차트 표시
+3. 수량 입력 후 [매수] 또는 [매도] 클릭
+4. 최대 10초 후 (다음 틱) 체결 → 인게임 채팅에도 결과 표시
+5. 우측 상단 🌙/☀️ 버튼으로 라이트/다크 테마 전환
 
 ---
 
@@ -210,6 +231,23 @@ offlineDashboardPath: 'kubejs/exports/dashboard.html',
 
 ---
 
+## 마크 내장 HTTP 서버 (Node 없이 전체 기능)
+
+`07_http_server.js` 가 마인크래프트 JVM 안에서 직접 작은 웹 서버를 띄웁니다. Node 서버(`server.js`)와 **완전히 동일한 API/파일 큐 방식**이라 매수/매도·관리자까지 그대로 동작하며, 별도 프로세스가 필요 없습니다.
+
+- 정적 자산은 `kubejs/web/` 에서 서빙하고 Chart.js 를 로컬 번들로 포함 → **인터넷 없이도 차트 표시**
+- 주문은 기존과 동일하게 `stocks_orders.json` 에 쌓이고 다음 틱에 `processOrders` 가 체결 → **스레드 안전**
+
+```js
+httpServerEnabled: true,        // 끄려면 false
+httpServerPort:    3000,        // 접속 포트
+httpServerHost:    '0.0.0.0',   // 0.0.0.0 = 로컬 + LAN 허용
+httpWebRoot:       'kubejs/web', // 정적 자산 폴더
+```
+
+> **싱글플레이/LAN 호스트**에서는 `localhost:3000` 으로 바로 접속됩니다. **전용 서버(dedicated)** 라면 서버 머신에서 바인딩되므로, 클라이언트는 `http://<서버IP>:3000` 으로 접속하고 방화벽에서 해당 포트를 열어야 합니다.
+> `com.sun.net.httpserver` 모듈이 없는 최소화 런타임에서는 자동 비활성화되며, 이때는 Node 서버(②)나 오프라인 파일(③)을 사용하세요.
+
 ## 트러블슈팅
 
 | 증상 | 원인 / 해결 |
@@ -219,6 +257,9 @@ offlineDashboardPath: 'kubejs/exports/dashboard.html',
 | 가격이 바뀌지 않음 | 서버가 일시정지됐거나 (싱글플레이) 콘솔에서 `[StockSystem] 가격 갱신 오류` 확인. |
 | 웹에서 매수했는데 체결이 안됨 | 게임이 실행 중이어야 합니다. 최대 10초(`updateIntervalTicks`) 대기. |
 | 한글이 깨짐 | KubeJS 스크립트 파일을 **UTF-8** 로 저장했는지 확인. |
+| K 키를 눌러도 안 열림 | 콘솔에서 `[StockHttp] ✔ ... 시작` 확인. 안 떴다면 `com.sun.net.httpserver` 미지원 런타임 → Node 서버/오프라인 파일 사용. MCEF 모드 설치 여부도 확인. |
+| `[StockHttp] 서버 시작 실패(이미 실행 중)` | `/reload` 후 흔히 발생. 이전 인스턴스가 계속 서빙하므로 정상 동작합니다. 깔끔히 재바인딩하려면 게임 재시작. |
+| 내장 서버 차트가 안 보임 | `kubejs/web/vendor/chart.umd.min.js` 가 복사됐는지 확인. |
 
 ---
 
@@ -236,19 +277,22 @@ offlineDashboardPath: 'kubejs/exports/dashboard.html',
 │   │       ├── 03_trading.js           # 매수/매도 + 웹 주문 처리
 │   │       ├── 04_commands.js          # !주식 채팅 명령어
 │   │       ├── 05_events.js            # 틱/로드/로그인 이벤트
-│   │       └── 06_offline_dashboard.js # 오프라인 자가완결형 HTML 생성
+│   │       ├── 06_offline_dashboard.js # 오프라인 자가완결형 HTML 생성
+│   │       └── 07_http_server.js       # 마크 JVM 내장 HTTP 서버 (Node 불필요)
 │   ├── client_scripts/
 │   │   └── stocks/
 │   │       ├── browser_screen.js       # MCEF 인게임 브라우저 (K=라이브, J=오프라인)
 │   │       └── keybind.js              # K/J 키 바인딩
+│   ├── web/                            # 내장 서버용 정적 자산 (Chart.js 로컬 번들 포함)
+│   │   ├── index.html
+│   │   ├── styles.css
+│   │   ├── app.js
+│   │   └── vendor/chart.umd.min.js
 │   └── exports/                        # 자동 생성 (state/orders/dashboard.html 등)
-├── web-gui/
-│   ├── server.js                # Express 브릿지 서버 (라이브/매매 모드)
+├── web-gui/                            # ② Node 브릿지 서버 (선택)
+│   ├── server.js
 │   ├── package.json
-│   └── public/
-│       ├── index.html           # 대시보드 마크업
-│       ├── styles.css           # 라이트/다크 테마 (한국 주식앱 스타일)
-│       └── app.js               # 폴링 + Chart.js + 테마 토글
+│   └── public/                         # index.html / styles.css / app.js
 └── README.md
 ```
 
