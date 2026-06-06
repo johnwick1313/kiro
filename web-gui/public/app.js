@@ -23,6 +23,29 @@ const S = {
 const $  = id => document.getElementById(id)
 const $$ = sel => document.querySelectorAll(sel)
 
+// ── 테마 (라이트 기본 + 다크 토글, localStorage 영속) ──
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+function applyTheme(theme) {
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    const t = $('theme-toggle'); if (t) t.textContent = '☀️'
+  } else {
+    document.documentElement.removeAttribute('data-theme')
+    const t = $('theme-toggle'); if (t) t.textContent = '🌙'
+  }
+  localStorage.setItem('sunlit-theme', theme)
+  // 차트 색상 갱신
+  if (S.chart) { S.chart.destroy(); S.chart = null; if (S.selected) renderChart() }
+}
+function toggleTheme() {
+  const cur = localStorage.getItem('sunlit-theme') || 'light'
+  applyTheme(cur === 'dark' ? 'light' : 'dark')
+}
+// 초기 테마 적용 (저장값 없으면 라이트)
+applyTheme(localStorage.getItem('sunlit-theme') || 'light')
+
 // ── 포맷 ──
 const fmtG   = n => (+(n||0)).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' G'
 const fmtPct = n => (n>=0?'+':'') + (+(n||0)).toFixed(2) + '%'
@@ -216,7 +239,15 @@ function renderChart() {
   const p       = S.prices[sym] || {}
   const history = p.history || []
   const isUp    = (p.change || 0) >= 0
-  const color   = isUp ? '#22c55e' : '#ef4444'
+  const upC     = cssVar('--up')   || '#e22c3a'
+  const downC   = cssVar('--down') || '#2f6bff'
+  const color   = isUp ? upC : downC
+  const fillUp  = cssVar('--up-soft')   || 'rgba(226,44,58,.10)'
+  const fillDn  = cssVar('--down-soft') || 'rgba(47,107,255,.10)'
+  const gridC   = cssVar('--hairline')  || 'rgba(0,0,0,0.06)'
+  const tickC   = cssVar('--muted')     || '#8b95a7'
+  const tipBg   = cssVar('--bg2')       || '#f7f8fa'
+  const tipTxt  = cssVar('--text')      || '#1a1d24'
   const labels  = history.map(h => fmtTime(h.t))
   const data    = history.map(h => h.p)
 
@@ -226,7 +257,7 @@ function renderChart() {
     S.chart.data.labels = labels
     S.chart.data.datasets[0].data            = data
     S.chart.data.datasets[0].borderColor     = color
-    S.chart.data.datasets[0].backgroundColor = isUp ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)'
+    S.chart.data.datasets[0].backgroundColor = isUp ? fillUp : fillDn
     S.chart.update('none')
     return
   }
@@ -239,7 +270,7 @@ function renderChart() {
       datasets: [{
         data,
         borderColor:     color,
-        backgroundColor: isUp ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)',
+        backgroundColor: isUp ? fillUp : fillDn,
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 5,
@@ -253,17 +284,17 @@ function renderChart() {
       interaction: { mode:'index', intersect:false },
       scales: {
         x: {
-          grid: { color:'rgba(255,255,255,0.04)' },
+          grid: { color: gridC },
           ticks: {
-            color:'#7b869e', font:{ family:'JetBrains Mono', size:10 },
+            color: tickC, font:{ family:'JetBrains Mono', size:10 },
             maxTicksLimit:8, maxRotation:0, autoSkip:true,
           },
         },
         y: {
-          grid: { color:'rgba(255,255,255,0.04)' },
+          grid: { color: gridC },
           position: 'right',
           ticks: {
-            color:'#7b869e', font:{ family:'JetBrains Mono', size:10 },
+            color: tickC, font:{ family:'JetBrains Mono', size:10 },
             callback: v => v.toLocaleString('ko-KR',{maximumFractionDigits:0}) + ' G',
           },
         },
@@ -271,11 +302,11 @@ function renderChart() {
       plugins: {
         legend: { display:false },
         tooltip: {
-          backgroundColor:'rgba(22,27,39,0.97)',
+          backgroundColor: tipBg,
           borderColor: color,
           borderWidth: 1,
-          titleColor:'#e8eaf0',
-          bodyColor:'#e8eaf0',
+          titleColor: tipTxt,
+          bodyColor: tipTxt,
           titleFont:{ family:'JetBrains Mono', size:11 },
           bodyFont:{ family:'JetBrains Mono', size:13 },
           padding:10,
@@ -462,7 +493,7 @@ async function deposit() {
   if (qty <= 0) return
   const r = await api('/api/deposit', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ uuid:S.user.uuid, emeralds:qty }),
+    body: JSON.stringify({ uuid:S.user.uuid, amount:qty }),
   })
   showExchMsg(r.ok, r.message)
   if (r.ok) setTimeout(poll, 1000)
@@ -473,7 +504,7 @@ async function withdraw() {
   if (qty <= 0) return
   const r = await api('/api/withdraw', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ uuid:S.user.uuid, emeralds:qty }),
+    body: JSON.stringify({ uuid:S.user.uuid, amount:qty }),
   })
   showExchMsg(r.ok, r.message)
   if (r.ok) setTimeout(poll, 1000)
@@ -613,6 +644,7 @@ $('order-btn').addEventListener('click', submitOrder)
 $('dep-btn').addEventListener('click',  deposit)
 $('with-btn').addEventListener('click', withdraw)
 $('ad-add-btn').addEventListener('click', addStock)
+$('theme-toggle').addEventListener('click', toggleTheme)
 
 // 시계
 setInterval(() => {
