@@ -1,37 +1,47 @@
 // priority: 5
 // ==========================================================
-// 선릿밸리 주식 시스템 - 키 바인딩 & 채팅 훅
+// 선릿밸리 주식 시스템 - 키 바인딩
 // [client_scripts] 클라이언트 전용
 // ==========================================================
 
-// K 키 = 라이브 서버 대시보드 / J 키 = 오프라인 대시보드 (서버 불필요)
-ClientEvents.tick(event => {
-    const mc = Java.loadClass('net.minecraft.client.Minecraft').getInstance()
-    if (!mc || !mc.player || mc.screen) return
+// KubeJS 2001 (1.20.1) 방식: KeybindEvent 사용 불가 시 tick + GLFW
+var _kDown = false
+var _jDown = false
+
+ClientEvents.tick(function(event) {
+    var player = Client.player
+    if (!player || Client.screen) return
 
     try {
-        const InputConstants = Java.loadClass('com.mojang.blaze3d.platform.InputConstants')
-        const win = mc.getWindow().getWindow()
-        const uuid = mc.player.getStringUUID ? mc.player.getStringUUID() : (mc.player.getUUID ? mc.player.getUUID().toString() : null)
+        var GLFW = Java.loadClass('org.lwjgl.glfw.GLFW')
+        var mc = Client.getMinecraft()
+        var win = mc.getWindow().getWindow()
+        var uuid = player.getStringUUID()
 
-        // K (75) - 라이브 서버 대시보드 (매수/매도 가능)
-        if (InputConstants.isKeyDown(win, 75 /* K */)) {
-            if (!global._kKeyWasDown) {
-                global._kKeyWasDown = true
-                global.openStockBrowser(uuid)
+        // K (75) - 라이브 서버 대시보드
+        if (GLFW.glfwGetKey(win, GLFW.GLFW_KEY_J) == GLFW.GLFW_PRESS) {
+            if (!_jDown) {
+                _jDown = true
+                if (global.openOfflineDashboard) global.openOfflineDashboard(uuid)
             }
         } else {
-            global._kKeyWasDown = false
+            _jDown = false
         }
 
-        // J (74) - 오프라인 대시보드 (Node 서버 없이, 읽기 전용)
-        if (InputConstants.isKeyDown(win, 74 /* J */)) {
-            if (!global._jKeyWasDown) {
-                global._jKeyWasDown = true
-                global.openOfflineDashboard(uuid)
+        // K (75) - 라이브 대시보드
+        if (GLFW.glfwGetKey(win, GLFW.GLFW_KEY_K) == GLFW.GLFW_PRESS) {
+            if (!_kDown) {
+                _kDown = true
+                if (global.openStockBrowser) global.openStockBrowser(uuid)
             }
         } else {
-            global._jKeyWasDown = false
+            _kDown = false
         }
-    } catch(e) {}
+    } catch(e) {
+        // 첫 에러만 로깅 (스팸 방지)
+        if (!global._stockKeyErrLogged) {
+            console.error('[StockKeybind] ' + e)
+            global._stockKeyErrLogged = true
+        }
+    }
 })

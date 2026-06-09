@@ -1,87 +1,44 @@
 // priority: 10
 // ==========================================================
-// 선릿밸리 주식 시스템 - MCEF 인게임 브라우저 화면
+// 선릿밸리 주식 시스템 - 브라우저 열기 (외부 브라우저 방식)
 // [client_scripts] 클라이언트 전용
 // ==========================================================
 
-const Minecraft = Java.loadClass('net.minecraft.client.Minecraft')
-const Component = Java.loadClass('net.minecraft.network.chat.Component')
-
-// MCEF 2.x (CinemaMod fork) 클래스들
-let MCEF = null
-let BrowserScreen = null
-
-try {
-    MCEF = Java.loadClass('net.cef.MCEF')
-} catch(e) {
-    try { MCEF = Java.loadClass('com.cinemamod.mcef.MCEF') } catch(e2) {}
-}
-try {
-    BrowserScreen = Java.loadClass('net.cef.client.gui.BrowserScreen')
-} catch(e) {
-    try { BrowserScreen = Java.loadClass('com.cinemamod.mcef.client.gui.BrowserScreen') } catch(e2) {}
-}
-
 const BASE_URL = 'http://localhost:3000'
 
-// 오프라인 대시보드 파일의 file:// URL 계산
-global.getOfflineDashboardUrl = function() {
+// URL을 시스템 기본 브라우저로 열기
+global.openStockBrowser = function(uuid) {
     try {
-        const File = Java.loadClass('java.io.File')
-        const f = new File('kubejs/exports/dashboard.html')
-        return f.toURI().toString()   // file:///.../kubejs/exports/dashboard.html
+        var url = uuid ? (BASE_URL + '?uuid=' + uuid) : BASE_URL
+        var URI = Java.loadClass('java.net.URI')
+        var Desktop = Java.loadClass('java.awt.Desktop')
+        Desktop.getDesktop().browse(URI.create(url))
     } catch(e) {
-        return null
+        if (Client.player) {
+            Client.player.sendSystemMessage(Component.string('§e[주식] 브라우저에서 열어주세요: ' + BASE_URL))
+        }
     }
 }
 
-// 공통: URL 을 MCEF(있으면) 또는 외부 브라우저로 열기
-function openUrl(url) {
-    const mc = Minecraft.getInstance()
-
-    if (!MCEF || !BrowserScreen) {
-        try {
-            Java.loadClass('java.awt.Desktop').getDesktop()
-                .browse(Java.loadClass('java.net.URI').create(url))
-        } catch(e) {
-            mc.player && mc.player.displayClientMessage(
-                Component.literal('§e[주식] 브라우저에서 열어주세요: ' + url), false
-            )
-        }
-        return
-    }
+// 오프라인 대시보드 (file:// 프로토콜)
+global.openOfflineDashboard = function(uuid) {
     try {
-        if (!MCEF.isInitialized()) {
-            mc.player && mc.player.displayClientMessage(
-                Component.literal('§c[주식] MCEF 초기화 중입니다. 잠시 후 다시 시도하세요.'), true
-            )
+        var File = Java.loadClass('java.io.File')
+        var Desktop = Java.loadClass('java.awt.Desktop')
+        var f = new File('kubejs/exports/dashboard.html')
+        if (!f.exists()) {
+            if (Client.player) {
+                Client.player.sendSystemMessage(Component.string('§c[주식] 오프라인 대시보드 파일을 찾을 수 없습니다.'))
+            }
             return
         }
-        const browser = MCEF.createBrowser(url, false)
-        const w = mc.getWindow().getGuiScaledWidth()
-        const h = mc.getWindow().getGuiScaledHeight()
-        browser.resize(w, h)
-        mc.execute(() => mc.setScreen(new BrowserScreen(browser)))
+        var url = f.toURI().toString()
+        if (uuid) url = url + '?uuid=' + uuid
+        var URI = Java.loadClass('java.net.URI')
+        Desktop.getDesktop().browse(URI.create(url))
     } catch(e) {
-        console.error('[StockBrowser] 오류: ' + e)
+        if (Client.player) {
+            Client.player.sendSystemMessage(Component.string('§c[주식] 대시보드 열기 실패: ' + e))
+        }
     }
-}
-
-// 라이브 대시보드 (전체 기능: 매수/매도/관리자)
-// 마크 내장 HTTP 서버(07_http_server.js) 또는 Node 서버로 동작
-global.openStockBrowser = function(uuid) {
-    openUrl(uuid ? (BASE_URL + '?uuid=' + uuid) : BASE_URL)
-}
-
-// 오프라인 대시보드 (서버 불필요, 읽기 전용)
-global.openOfflineDashboard = function(uuid) {
-    const fileUrl = global.getOfflineDashboardUrl()
-    if (!fileUrl) {
-        const mc = Minecraft.getInstance()
-        mc.player && mc.player.displayClientMessage(
-            Component.literal('§c[주식] 오프라인 대시보드 파일을 찾을 수 없습니다. 월드에 한 번 접속해 생성하세요.'), false
-        )
-        return
-    }
-    openUrl(uuid ? (fileUrl + '?uuid=' + uuid) : fileUrl)
 }
