@@ -10,9 +10,9 @@
 // - 읽기 전용 (매수/매도는 인게임 !주식 명령어 사용)
 // ==========================================================
 
-var _Files = Java.type('java.nio.file.Files')
-var _Paths = Java.type('java.nio.file.Paths')
-var _StandardCharsets = Java.type('java.nio.charset.StandardCharsets')
+var _Files = java('java.nio.file.Files')
+var _Paths = java('java.nio.file.Paths')
+var _StandardCharsets = java('java.nio.charset.StandardCharsets')
 
 // ── 페이지 CSS (한국 주식앱 스타일, 라이트 기본 + 다크) ──
 var DASH_CSS = [
