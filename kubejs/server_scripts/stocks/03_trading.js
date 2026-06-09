@@ -154,5 +154,5 @@ global.processOrders = function (server) {
 
     // 처리 완료, 응답을 별도 파일에 저장하고 주문 큐 비움
     JsonIO.write(global.STOCK_CONFIG.ordersPath, { orders: [] })
-    JsonIO.write('kubejs/exports/stocks_responses.json', { responses, at: Date.now() })
+    JsonIO.write('kubejs/exports/stocks_responses.json', { responses: responses, at: Date.now() })
 }
