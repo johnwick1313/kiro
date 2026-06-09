@@ -25,13 +25,13 @@
     // ── 필요한 자바 타입 로드 (모듈 없으면 여기서 실패 → 안전하게 종료) ──
     var HttpServer, InetSocketAddress, Files, Paths, StandardCharsets, UUIDt, URLDecoder
     try {
-        HttpServer        = java('com.sun.net.httpserver.HttpServer')
-        InetSocketAddress = java('java.net.InetSocketAddress')
-        Files             = java('java.nio.file.Files')
-        Paths             = java('java.nio.file.Paths')
-        StandardCharsets  = java('java.nio.charset.StandardCharsets')
-        UUIDt             = java('java.util.UUID')
-        URLDecoder        = java('java.net.URLDecoder')
+        HttpServer        = Java.loadClass('com.sun.net.httpserver.HttpServer')
+        InetSocketAddress = Java.loadClass('java.net.InetSocketAddress')
+        Files             = Java.loadClass('java.nio.file.Files')
+        Paths             = Java.loadClass('java.nio.file.Paths')
+        StandardCharsets  = Java.loadClass('java.nio.charset.StandardCharsets')
+        UUIDt             = Java.loadClass('java.util.UUID')
+        URLDecoder        = Java.loadClass('java.net.URLDecoder')
     } catch (e) {
         console.warn('[StockHttp] com.sun.net.httpserver 를 사용할 수 없어 임베디드 서버를 끕니다.')
         console.warn('[StockHttp] -> Node 서버(web-gui) 또는 J키 오프라인 대시보드를 사용하세요. (' + e + ')')
@@ -324,7 +324,7 @@
     }
 
     // ── 루트 핸들러 ──
-    var rootHandler = new (java('com.sun.net.httpserver.HttpHandler'))({
+    var rootHandler = new (Java.loadClass('com.sun.net.httpserver.HttpHandler'))({
         handle: function (ex) {
             try {
                 var method = ex.getRequestMethod()

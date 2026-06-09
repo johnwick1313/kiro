@@ -121,7 +121,7 @@ PlayerEvents.loggedIn(function(event) {
     player.tell(Text.of('  📈 Sunlit Exchange').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('잔고: ').color('gray')
-        .append(Text.of(playerData.balance.toFixed(2) + ' G').color('white').bold(true)))
+        .append(Text.of(Number(playerData.balance || 0).toFixed(2) + ' G').color('white').bold(true)))
     player.tell(
         Text.of('  ▶ ').color('green').append(
             Text.of('[ 대시보드 열기 — 자동 로그인 ]')

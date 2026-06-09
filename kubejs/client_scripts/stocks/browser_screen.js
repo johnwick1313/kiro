@@ -4,22 +4,22 @@
 // [client_scripts] 클라이언트 전용
 // ==========================================================
 
-const Minecraft = Java.type('net.minecraft.client.Minecraft')
-const Component = Java.type('net.minecraft.network.chat.Component')
+const Minecraft = Java.loadClass('net.minecraft.client.Minecraft')
+const Component = Java.loadClass('net.minecraft.network.chat.Component')
 
 // MCEF 2.x (CinemaMod fork) 클래스들
 let MCEF = null
 let BrowserScreen = null
 
 try {
-    MCEF = Java.type('net.cef.MCEF')
+    MCEF = Java.loadClass('net.cef.MCEF')
 } catch(e) {
-    try { MCEF = Java.type('com.cinemamod.mcef.MCEF') } catch(e2) {}
+    try { MCEF = Java.loadClass('com.cinemamod.mcef.MCEF') } catch(e2) {}
 }
 try {
-    BrowserScreen = Java.type('net.cef.client.gui.BrowserScreen')
+    BrowserScreen = Java.loadClass('net.cef.client.gui.BrowserScreen')
 } catch(e) {
-    try { BrowserScreen = Java.type('com.cinemamod.mcef.client.gui.BrowserScreen') } catch(e2) {}
+    try { BrowserScreen = Java.loadClass('com.cinemamod.mcef.client.gui.BrowserScreen') } catch(e2) {}
 }
 
 const BASE_URL = 'http://localhost:3000'
@@ -27,7 +27,7 @@ const BASE_URL = 'http://localhost:3000'
 // 오프라인 대시보드 파일의 file:// URL 계산
 global.getOfflineDashboardUrl = function() {
     try {
-        const File = Java.type('java.io.File')
+        const File = Java.loadClass('java.io.File')
         const f = new File('kubejs/exports/dashboard.html')
         return f.toURI().toString()   // file:///.../kubejs/exports/dashboard.html
     } catch(e) {
@@ -41,8 +41,8 @@ function openUrl(url) {
 
     if (!MCEF || !BrowserScreen) {
         try {
-            Java.type('java.awt.Desktop').getDesktop()
-                .browse(Java.type('java.net.URI').create(url))
+            Java.loadClass('java.awt.Desktop').getDesktop()
+                .browse(Java.loadClass('java.net.URI').create(url))
         } catch(e) {
             mc.player && mc.player.displayClientMessage(
                 Component.literal('§e[주식] 브라우저에서 열어주세요: ' + url), false

@@ -6,11 +6,11 @@
 
 // K 키 = 라이브 서버 대시보드 / J 키 = 오프라인 대시보드 (서버 불필요)
 ClientEvents.tick(event => {
-    const mc = Java.type('net.minecraft.client.Minecraft').getInstance()
+    const mc = Java.loadClass('net.minecraft.client.Minecraft').getInstance()
     if (!mc || !mc.player || mc.screen) return
 
     try {
-        const InputConstants = Java.type('com.mojang.blaze3d.platform.InputConstants')
+        const InputConstants = Java.loadClass('com.mojang.blaze3d.platform.InputConstants')
         const win = mc.getWindow().getWindow()
         const uuid = mc.player.getStringUUID ? mc.player.getStringUUID() : (mc.player.getUUID ? mc.player.getUUID().toString() : null)
 
