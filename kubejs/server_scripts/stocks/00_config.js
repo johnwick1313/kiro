@@ -37,23 +37,78 @@ global.STOCK_CONFIG = {
     // 가격 갱신 주기 (틱 단위, 20틱 = 1초)
     updateIntervalTicks: 200,           // 10초마다 갱신
 
-    // 신규 플레이어 시작 잔고 (Gold 단위)
+    // 신규 플레이어 시작 잔고 (주식계좌 내부 단위 = G)
     startingBalance: 1000,
 
-    // 에메랄드 1개 -> 골드 변환 비율
-    goldPerEmerald: 100,
-
-    // 에메랄드 블록 1개 -> 골드 변환 비율
-    goldPerEmeraldBlock: 900,
-
-    // 사용 통화 아이템
+    // ── 레거시 호환 필드 (currency.mode === 'emerald' 일 때 사용) ──
+    goldPerEmerald: 100,            // 에메랄드 1개 -> 골드
+    goldPerEmeraldBlock: 900,       // 에메랄드 블록 1개 -> 골드
     currencyItem: 'minecraft:emerald',
     currencyBlockItem: 'minecraft:emerald_block',
+
+    // ==========================================================
+    // 화폐(모드팩 통화) 연동 설정
+    // ==========================================================
+    // 주식계좌 잔고는 항상 내부 단위(G)로 관리하고,
+    // "충전/출금" 시 아래에 설정한 모드팩 화폐와 1:1(또는 비율)로 환전합니다.
+    // (실제 증권 계좌 입출금과 동일한 브로커리지 모델)
+    //
+    // mode 별 동작:
+    //   'lightmans'  - Lightman's Currency 코인 (선릿밸리 모드팩 기본 화폐)
+    //   'item'       - 임의의 단일 아이템 (예: minecraft:emerald)
+    //   'emerald'    - 레거시 에메랄드 모드 (위 goldPerEmerald 사용)
+    //   'scoreboard' - 스코어보드 점수를 화폐로 사용 (다른 경제 모드 연동용)
+    //   'command'    - 임의의 명령어로 입출금 위임 (모든 경제 모드 브릿지)
+    currency: {
+        mode: 'lightmans',
+
+        // 화면/메시지에 표시할 화폐 단위명
+        unit: 'G',
+
+        // ── mode: 'lightmans' / 'item' 공통 ──
+        // 코인 액면가 목록 (value 큰 것 -> 작은 것 순으로 자동 정렬됨)
+        // value = 코인 1개당 G 가치. 모드팩에 맞게 자유롭게 조정하세요.
+        // 코인 ID 가 다르면 인게임에서 /kubejs hand 로 확인 후 수정.
+        coins: [
+            { id: 'lightmanscurrency:coin_copper',    value: 1     },
+            { id: 'lightmanscurrency:coin_iron',      value: 10    },
+            { id: 'lightmanscurrency:coin_gold',      value: 100   },
+            { id: 'lightmanscurrency:coin_emerald',   value: 1000  },
+            { id: 'lightmanscurrency:coin_diamond',   value: 10000 },
+            // 선릿밸리에서 netherite -> iridium 으로 리네임됨. 둘 중 존재하는 ID 사용.
+            { id: 'lightmanscurrency:coin_netherite', value: 100000 },
+        ],
+
+        // ── mode: 'scoreboard' ──
+        scoreboardObjective: 'money',   // /scoreboard objectives add money dummy
+        scoreboardPerG: 1,              // 점수 1점 = ? G
+
+        // ── mode: 'command' ──
+        // {player} {amount} 가 치환됩니다. (amount = 화폐 단위 정수)
+        depositQueryCmd:    'lightmanscurrency money get {player}',  // 참고용
+        withdrawGiveCmd:    'lightmanscurrency money give {player} {amount}',
+        depositTakeCmd:     'lightmanscurrency money take {player} {amount}',
+    },
 
     // KubeJS 데이터 파일 경로 (모드팩의 kubejs 폴더 기준)
     exportPath: 'kubejs/exports/stocks_state.json',
     ordersPath: 'kubejs/exports/stocks_orders.json',
     auditPath:  'kubejs/exports/stocks_audit.json',
+
+    // ── 오프라인 대시보드 (Node 서버 없이 마크 내/브라우저에서 직접 열기) ──
+    // 매 가격 갱신마다 데이터가 내장된 자가완결형 HTML 파일을 생성합니다.
+    // file:// 로 MCEF 또는 일반 브라우저에서 바로 열 수 있습니다. (읽기 전용)
+    offlineDashboardEnabled: true,
+    offlineDashboardPath: 'kubejs/exports/dashboard.html',
+
+    // ── 임베디드 HTTP 서버 (마크 JVM 내장, 별도 Node 서버 불필요) ──
+    // KubeJS 가 마인크래프트 안에서 직접 작은 웹 서버를 띄웁니다.
+    // 매수/매도/관리자까지 전체 기능을 Node 없이 사용할 수 있습니다.
+    // (JDK 의 com.sun.net.httpserver 사용. 일부 최소화된 런타임엔 없을 수 있음)
+    httpServerEnabled: true,
+    httpServerPort: 3000,           // MCEF/브라우저가 접속할 포트 (Node 서버와 동일)
+    httpServerHost: '0.0.0.0',      // 0.0.0.0 = 로컬 + LAN 모두 허용
+    httpWebRoot: 'kubejs/web',      // 정적 웹 자산 폴더 (index.html 등)
 
     // 차트용 가격 히스토리 보관 길이
     historyLength: 60,

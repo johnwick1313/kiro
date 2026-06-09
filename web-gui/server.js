@@ -162,40 +162,40 @@ app.post('/api/order', (req, res) => {
   res.json({ ok:true, message:`주문 접수 (최대 10초 내 체결)`, order })
 })
 
-// ── 에메랄드 충전 (웹에서는 잔고만 조작, 실제 아이템은 인게임에서만) ──
+// ── 화폐 충전 (웹에서는 요청만, 실제 차감은 인게임 KubeJS) ──
 app.post('/api/deposit', (req, res) => {
-  const { uuid, emeralds } = req.body || {}
+  const { uuid } = req.body || {}
   const state = readJson(P.state, null)
   if (!state?.players?.[uuid])
     return res.status(403).json({ ok:false, message:'인증 실패' })
-  const n = parseInt(emeralds)
-  if (!n || n <= 0) return res.status(400).json({ ok:false, message:'수량 오류' })
+  const n = parseInt(req.body?.amount ?? req.body?.emeralds)
+  if (!n || n <= 0) return res.status(400).json({ ok:false, message:'금액 오류' })
 
-  // 웹에서는 주문 큐로 처리 (KubeJS 가 인벤토리 차감)
+  // 웹에서는 주문 큐로 처리 (KubeJS 가 인벤토리에서 화폐 차감)
   const order = {
     id: crypto.randomUUID(), uuid,
     username: state.players[uuid].username,
-    type: 'deposit', emeralds: n, at: Date.now(),
+    type: 'deposit', amount: n, at: Date.now(),
   }
   enqueueOrder(order)
-  res.json({ ok:true, message:`에메랄드 ${n}개 충전 요청 접수 (인게임에서 처리됩니다)` })
+  res.json({ ok:true, message:`${n} G 충전 요청 접수 (인게임에서 화폐 차감)` })
 })
 
 app.post('/api/withdraw', (req, res) => {
-  const { uuid, emeralds } = req.body || {}
+  const { uuid } = req.body || {}
   const state = readJson(P.state, null)
   if (!state?.players?.[uuid])
     return res.status(403).json({ ok:false, message:'인증 실패' })
-  const n = parseInt(emeralds)
-  if (!n || n <= 0) return res.status(400).json({ ok:false, message:'수량 오류' })
+  const n = parseInt(req.body?.amount ?? req.body?.emeralds)
+  if (!n || n <= 0) return res.status(400).json({ ok:false, message:'금액 오류' })
 
   const order = {
     id: crypto.randomUUID(), uuid,
     username: state.players[uuid].username,
-    type: 'withdraw', emeralds: n, at: Date.now(),
+    type: 'withdraw', amount: n, at: Date.now(),
   }
   enqueueOrder(order)
-  res.json({ ok:true, message:`에메랄드 ${n}개 출금 요청 접수 (인게임에서 처리됩니다)` })
+  res.json({ ok:true, message:`${n} G 출금 요청 접수 (인게임에서 화폐 지급)` })
 })
 
 // =============================================================

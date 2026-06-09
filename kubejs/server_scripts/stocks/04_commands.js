@@ -27,6 +27,29 @@ function sendWebLink(player) {
                     .hover({ type: 'text', value: Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white') })
             )
     )
+    player.tell(Text.gray('마크 내장 서버로 동작합니다 (별도 Node 서버 불필요). 인게임은 K 키.'))
+    player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+}
+
+function sendOfflineLink(player) {
+    let url = null
+    try {
+        const File = Java.type('java.io.File')
+        url = new File(global.STOCK_CONFIG.offlineDashboardPath).toURI().toString()
+    } catch (e) {}
+    player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+    player.tell(Text.of('  📄 오프라인 대시보드 (서버 불필요)').color('yellow').bold(true))
+    player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+    if (url) {
+        player.tell(
+            Text.of('  ▶ ').color('green').append(
+                Text.of('[ 오프라인 대시보드 열기 ]').color('aqua').underlined(true)
+                    .click({ type: 'open_url', value: url + '?uuid=' + player.stringUuid })
+                    .hover({ type: 'text', value: Text.white('읽기 전용 · Node 서버 없이 동작') })
+            )
+        )
+    }
+    player.tell(Text.gray('인게임에서는 J 키로도 열 수 있습니다. (라이브 서버는 K 키)'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 
@@ -38,10 +61,11 @@ function sendHelp(player) {
     player.tell(Text.of('!주식 매도 [심볼] [수량]').color('aqua').append(Text.white(' - 매도 주문')))
     player.tell(Text.of('!주식 포트폴리오      ').color('aqua').append(Text.white('- 보유 종목 조회')))
     player.tell(Text.of('!주식 잔고            ').color('aqua').append(Text.white('- 보유 골드 조회')))
-    player.tell(Text.of('!주식 충전 [에메랄드수]').color('aqua').append(Text.white(' - 에메랄드 -> 골드 환전')))
-    player.tell(Text.of('!주식 출금 [수량]     ').color('aqua').append(Text.white('- 골드 -> 에메랄드 환전')))
+    player.tell(Text.of('!주식 충전 [금액]    ').color('aqua').append(Text.white('- 모드팩 화폐 -> 계좌 입금')))
+    player.tell(Text.of('!주식 출금 [금액]    ').color('aqua').append(Text.white('- 계좌 -> 모드팩 화폐 출금')))
     player.tell(Text.of('!주식 거래내역        ').color('aqua').append(Text.white('- 최근 거래 10건')))
     player.tell(Text.of('!주식 웹              ').color('aqua').append(Text.white('- 웹 대시보드 링크 열기')))
+    player.tell(Text.of('!주식 오프라인        ').color('aqua').append(Text.white('- 서버 없이 보는 대시보드 (J키)')))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 
@@ -126,55 +150,46 @@ function sendHistory(player, playerData) {
     })
 }
 
-function handleDeposit(player, data, playerData, count) {
-    if (!Number.isFinite(count) || count <= 0) { player.tell(Text.red('잘못된 수량')); return }
-    count = Math.floor(count)
+// 충전: 인벤토리의 모드팩 화폐 -> 주식계좌 잔고 (amount = G 금액)
+function handleDeposit(player, data, playerData, amount) {
+    const U = global.Currency.unit()
+    if (!Number.isFinite(amount) || amount <= 0) { player.tell(Text.red('잘못된 금액입니다.')); return }
+    amount = Math.floor(amount)
 
-    // 인벤토리에서 에메랄드 차감 (간단 구현 - 인게임 명령어로 차감)
-    const itemId = global.STOCK_CONFIG.currencyItem
-    const inv    = player.inventory
-    let owned    = 0
-    for (let i = 0; i < inv.size(); i++) {
-        const stack = inv.getItem(i)
-        if (!stack || stack.empty) continue
-        if (stack.id === itemId) owned += stack.count
-    }
-    if (owned < count) {
-        player.tell(Text.red('에메랄드가 부족합니다. 보유: ' + owned + '개'))
+    const held = global.Currency.heldG(player)
+    if (held < amount) {
+        player.tell(Text.red('보유 화폐가 부족합니다. 보유: ' + held + ' ' + U + ' (' + global.Currency.label() + ')'))
         return
     }
 
-    // 차감
-    let remaining = count
-    for (let i = 0; i < inv.size() && remaining > 0; i++) {
-        const stack = inv.getItem(i)
-        if (!stack || stack.empty) continue
-        if (stack.id === itemId) {
-            const take = Math.min(stack.count, remaining)
-            stack.count -= take
-            inv.setItem(i, stack.count <= 0 ? Item.of('minecraft:air') : stack)
-            remaining -= take
-        }
-    }
+    const res = global.Currency.take(player, amount)
+    if (!res.ok) { player.tell(Text.red(res.message || '충전 실패')); return }
 
-    const credited = count * global.STOCK_CONFIG.goldPerEmerald
-    playerData.balance += credited
-    player.tell(Text.green('충전 완료: 에메랄드 ' + count + '개 -> ' + credited + ' G'))
-    player.tell(Text.gold('현재 잔고: ' + playerData.balance.toFixed(2) + ' G'))
+    playerData.balance += res.taken
+    player.tell(Text.green('충전 완료: ' + res.taken + ' ' + U + ' (' + global.Currency.label() + ' 차감)'))
+    player.tell(Text.gold('현재 잔고: ' + playerData.balance.toFixed(2) + ' ' + U))
 }
 
-function handleWithdraw(player, playerData, count) {
-    if (!Number.isFinite(count) || count <= 0) { player.tell(Text.red('잘못된 수량')); return }
-    count = Math.floor(count)
+// 출금: 주식계좌 잔고 -> 인벤토리 모드팩 화폐 (amount = G 금액)
+function handleWithdraw(player, playerData, amount) {
+    const U = global.Currency.unit()
+    if (!Number.isFinite(amount) || amount <= 0) { player.tell(Text.red('잘못된 금액입니다.')); return }
+    amount = Math.floor(amount)
 
-    const goldNeeded = count * global.STOCK_CONFIG.goldPerEmerald
-    if (playerData.balance < goldNeeded) {
-        player.tell(Text.red('잔고 부족. 필요: ' + goldNeeded + ' G'))
+    if (playerData.balance < amount) {
+        player.tell(Text.red('잔고 부족. 필요: ' + amount + ' ' + U + ' / 보유: ' + playerData.balance.toFixed(2) + ' ' + U))
         return
     }
-    playerData.balance -= goldNeeded
-    player.give(Item.of(global.STOCK_CONFIG.currencyItem, count))
-    player.tell(Text.green('출금 완료: ' + goldNeeded + ' G -> 에메랄드 ' + count + '개'))
+
+    const res = global.Currency.give(player, amount)
+    if (!res.ok) { player.tell(Text.red(res.message || '출금 실패')); return }
+
+    playerData.balance -= res.given
+    player.tell(Text.green('출금 완료: ' + res.given + ' ' + U + ' -> ' + global.Currency.label() + ' 지급'))
+    if (res.given < amount) {
+        player.tell(Text.gray('* 액면 단위로 떨어지지 않는 ' + (amount - res.given) + ' ' + U + ' 은 잔고에 남습니다.'))
+    }
+    player.tell(Text.gold('현재 잔고: ' + playerData.balance.toFixed(2) + ' ' + U))
 }
 
 // 채팅 이벤트로 명령어 처리
@@ -197,6 +212,8 @@ PlayerEvents.chat(event => {
     switch (cmd) {
         case '웹': case 'web': case 'gui':
             sendWebLink(player); break
+        case '오프라인': case 'offline':
+            sendOfflineLink(player); break
         case '도움말': case 'help': case '?':
             sendHelp(player); break
         case '목록': case 'list': case 'ls':
@@ -218,9 +235,9 @@ PlayerEvents.chat(event => {
         case '잔고': case 'balance': case 'bal':
             player.tell(Text.gold('잔고: ' + playerData.balance.toFixed(2) + ' G')); break
         case '충전': case 'deposit':
-            handleDeposit(player, data, playerData, parseInt(args[1]) || 1); dirty = true; break
+            handleDeposit(player, data, playerData, parseInt(args[1])); dirty = true; break
         case '출금': case 'withdraw':
-            handleWithdraw(player, playerData, parseInt(args[1]) || 1); dirty = true; break
+            handleWithdraw(player, playerData, parseInt(args[1])); dirty = true; break
         case '거래내역': case 'history':
             sendHistory(player, playerData); break
         default:

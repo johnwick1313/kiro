@@ -24,12 +24,22 @@ try {
 
 const BASE_URL = 'http://localhost:3000'
 
-global.openStockBrowser = function(uuid) {
-    const url = uuid ? (BASE_URL + '?uuid=' + uuid) : BASE_URL
-    const mc  = Minecraft.getInstance()
+// 오프라인 대시보드 파일의 file:// URL 계산
+global.getOfflineDashboardUrl = function() {
+    try {
+        const File = Java.type('java.io.File')
+        const f = new File('kubejs/exports/dashboard.html')
+        return f.toURI().toString()   // file:///.../kubejs/exports/dashboard.html
+    } catch(e) {
+        return null
+    }
+}
+
+// 공통: URL 을 MCEF(있으면) 또는 외부 브라우저로 열기
+function openUrl(url) {
+    const mc = Minecraft.getInstance()
 
     if (!MCEF || !BrowserScreen) {
-        // MCEF 없으면 외부 브라우저로 폴백
         try {
             Java.type('java.awt.Desktop').getDesktop()
                 .browse(Java.type('java.net.URI').create(url))
@@ -40,7 +50,6 @@ global.openStockBrowser = function(uuid) {
         }
         return
     }
-
     try {
         if (!MCEF.isInitialized()) {
             mc.player && mc.player.displayClientMessage(
@@ -56,4 +65,23 @@ global.openStockBrowser = function(uuid) {
     } catch(e) {
         console.error('[StockBrowser] 오류: ' + e)
     }
+}
+
+// 라이브 대시보드 (전체 기능: 매수/매도/관리자)
+// 마크 내장 HTTP 서버(07_http_server.js) 또는 Node 서버로 동작
+global.openStockBrowser = function(uuid) {
+    openUrl(uuid ? (BASE_URL + '?uuid=' + uuid) : BASE_URL)
+}
+
+// 오프라인 대시보드 (서버 불필요, 읽기 전용)
+global.openOfflineDashboard = function(uuid) {
+    const fileUrl = global.getOfflineDashboardUrl()
+    if (!fileUrl) {
+        const mc = Minecraft.getInstance()
+        mc.player && mc.player.displayClientMessage(
+            Component.literal('§c[주식] 오프라인 대시보드 파일을 찾을 수 없습니다. 월드에 한 번 접속해 생성하세요.'), false
+        )
+        return
+    }
+    openUrl(uuid ? (fileUrl + '?uuid=' + uuid) : fileUrl)
 }
