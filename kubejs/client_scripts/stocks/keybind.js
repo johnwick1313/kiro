@@ -4,10 +4,11 @@
 // [client_scripts] 클라이언트 전용
 // ==========================================================
 
-// GLFW를 파일 상단에서 한 번만 로드 (매 틱마다 로드하면 느림)
+// LWJGL GLFW는 게임 엔진 라이브러리이므로 클래스 필터에 차단되지 않음
 var _GLFW = null
 try {
     _GLFW = Java.loadClass('org.lwjgl.glfw.GLFW')
+    console.info('[StockKeybind] GLFW 로드 성공. K=대시보드, J=오프라인')
 } catch(e) {
     console.error('[StockKeybind] GLFW 로드 실패: ' + e)
 }
@@ -23,27 +24,24 @@ ClientEvents.tick(function(event) {
 
     var mc = Client.getMinecraft()
     var win = mc.getWindow().getWindow()
-    var uuid = player.getStringUUID()
 
     // J (74) - 오프라인 대시보드
     var jPressed = (_GLFW.glfwGetKey(win, 74) == 1)
-    if (jPressed) {
-        if (!_jDown) {
-            _jDown = true
-            if (global.openOfflineDashboard) global.openOfflineDashboard(uuid)
+    if (jPressed && !_jDown) {
+        _jDown = true
+        if (global.openOfflineDashboard) {
+            global.openOfflineDashboard(player.getStringUUID())
         }
-    } else {
-        _jDown = false
     }
+    if (!jPressed) _jDown = false
 
     // K (75) - 라이브 대시보드
     var kPressed = (_GLFW.glfwGetKey(win, 75) == 1)
-    if (kPressed) {
-        if (!_kDown) {
-            _kDown = true
-            if (global.openStockBrowser) global.openStockBrowser(uuid)
+    if (kPressed && !_kDown) {
+        _kDown = true
+        if (global.openStockBrowser) {
+            global.openStockBrowser(player.getStringUUID())
         }
-    } else {
-        _kDown = false
     }
+    if (!kPressed) _kDown = false
 })

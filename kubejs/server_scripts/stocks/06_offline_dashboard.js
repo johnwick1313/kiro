@@ -2,17 +2,8 @@
 // ==========================================================
 // 선릿밸리 주식 시스템 - 오프라인 자가완결형 HTML 대시보드 생성기
 // ==========================================================
-// Node 브릿지 서버 없이도 마크 내(MCEF) 또는 일반 브라우저에서
-// file:// 로 바로 열 수 있는, 데이터가 내장된 단일 HTML 파일을 생성합니다.
-// - 외부 의존성 0 (Chart.js CDN 대신 인라인 SVG 스파크라인)
-// - 매 가격 갱신마다 파일을 다시 써서 최신 시세 반영
-// - 페이지는 8초마다 자동 새로고침
-// - 읽기 전용 (매수/매도는 인게임 !주식 명령어 사용)
+// KubeJS 내장 JsonIO/FileIO 사용 (java.nio.file.Files 클래스 필터 차단 우회)
 // ==========================================================
-
-var _Files = Java.loadClass('java.nio.file.Files')
-var _Paths = Java.loadClass('java.nio.file.Paths')
-var _StandardCharsets = Java.loadClass('java.nio.charset.StandardCharsets')
 
 // ── 페이지 CSS (한국 주식앱 스타일, 라이트 기본 + 다크) ──
 var DASH_CSS = [
@@ -62,7 +53,7 @@ var DASH_JS = [
 'function spark(h,up){if(!h||h.length<2)return "";var v=h.map(function(x){return x.p;});var mn=Math.min.apply(null,v),mx=Math.max.apply(null,v),w=110,ht=30,rg=(mx-mn)||1;var p=v.map(function(val,i){var x=i/(v.length-1)*w;var y=ht-((val-mn)/rg)*ht;return x.toFixed(1)+","+y.toFixed(1);}).join(" ");return "<svg width=\\""+w+"\\" height=\\""+ht+"\\" viewBox=\\"0 0 "+w+" "+ht+"\\"><polyline fill=\\"none\\" stroke=\\""+(up?"var(--up)":"var(--down)")+"\\" stroke-width=\\"1.5\\" points=\\""+p+"\\"/></svg>";}',
 'function uuidParam(){return new URLSearchParams(location.search).get("uuid");}',
 'function renderMarket(){var st=(D.meta&&D.meta.stocks)||[];var rows=st.map(function(s){var pr=D.prices[s.symbol]||{};var c=pr.change||0;return "<tr><td><span class=\\"sym\\">"+esc(s.symbol)+"</span><div class=\\"nm\\">"+esc(s.name||"")+"</div></td><td>"+spark(pr.history,c>=0)+"</td><td style=\\"text-align:right\\">"+fmtG(pr.current)+"</td><td class=\\""+cl(c)+"\\" style=\\"text-align:right\\">"+fmtP(c)+"</td></tr>";}).join("");document.getElementById("mkt").innerHTML=rows||"<tr><td colspan=4 class=empty>시세 데이터 없음</td></tr>";}',
-'function renderAccount(){var id=uuidParam();var box=document.getElementById("acc");var p=id&&D.players?D.players[id]:null;if(!p){box.innerHTML="<div class=empty>계좌 정보 없음<br>(인게임에서 !주식 웹 으로 자동로그인 링크를 사용하세요)</div>";document.getElementById("uname").textContent="미접속";return;}document.getElementById("uname").textContent=p.username||"-";var cash=p.balance||0,val=cash,cost=0;var hold=[];Object.keys(p.portfolio||{}).forEach(function(sym){var sh=p.portfolio[sym];var avg=(p.avgCost||{})[sym]||0;var price=((D.prices[sym]||{}).current)||0;var v=price*sh,ct=avg*sh;val+=v;cost+=ct;hold.push({sym:sym,sh:sh,avg:avg,v:v,pl:v-ct,plp:ct>0?(v-ct)/ct*100:0});});var pl=val-cash-cost;var plp=cost>0?pl/cost*100:0;box.innerHTML="<div class=big>"+fmtG(cash)+"</div><div class=lbl>현금 잔고</div><div class=divider></div><div class=row><span>총 자산</span><b>"+fmtG(val)+"</b></div><div class=row><span>투자원금</span><b>"+fmtG(cost)+"</b></div><div class=row><span>평가손익</span><b class=\\""+cl(pl)+"\\">"+(pl>=0?"+":"")+fmtG(pl)+"</b></div><div class=row><span>수익률</span><b class=\\""+cl(plp)+"\\">"+fmtP(plp)+"</b></div>";var hl=document.getElementById("hold");hl.innerHTML=hold.length?hold.map(function(h){return "<tr><td class=sym>"+esc(h.sym)+"</td><td style=\\"text-align:right\\">"+h.sh+"주</td><td style=\\"text-align:right\\">"+fmtG(h.v)+"</td><td class=\\""+cl(h.pl)+"\\" style=\\"text-align:right\\">"+fmtP(h.plp)+"</td></tr>";}).join(""):"<tr><td colspan=4 class=empty>보유 종목 없음</td></tr>";var tx=(p.transactions||[]).slice(0,15);document.getElementById("hist").innerHTML=tx.length?tx.map(function(t){return "<tr><td>"+new Date(t.at).toLocaleString("ko-KR",{hour12:false})+"</td><td><span class=\\""+(t.type==="buy"?"badge-buy":"badge-sell")+"\\">"+(t.type==="buy"?"매수":"매도")+"</span></td><td class=sym>"+esc(t.symbol)+"</td><td style=\\"text-align:right\\">"+t.shares+"주</td><td style=\\"text-align:right\\">"+fmtG(t.price)+"</td></tr>";}).join(""):"<tr><td colspan=5 class=empty>거래내역 없음</td></tr>";}',
+'function renderAccount(){var id=uuidParam();var box=document.getElementById("acc");var p=id&&D.players?D.players[id]:null;if(!p){box.innerHTML="<div class=empty>계좌 정보 없음<br>(인게임에서 !주식 웹 으로 자동로그인 링크를 사용하세요)</div>";document.getElementById("uname").textContent="미접속";return;}document.getElementById("uname").textContent=p.username||"-";var cash=p.balance||0,val=cash,cost=0;var hold=[];Object.keys(p.portfolio||{}).forEach(function(sym){var sh=p.portfolio[sym];var avg=(p.avgCost||{})[sym]||0;var price=((D.prices[sym]||{}).current)||0;var v=price*sh,ct=avg*sh;val+=v;cost+=ct;hold.push({sym:sym,sh:sh,avg:avg,v:v,pl:v-ct,plp:ct>0?(v-ct)/ct*100:0});});var pl=val-cash-cost;var plp=cost>0?pl/cost*100:0;box.innerHTML="<div class=big>"+fmtG(cash)+"</div><div class=lbl>현금 잔고</div><div class=divider></div><div class=row><span>총 자산</span><b>"+fmtG(val)+"</b></div><div class=row><span>투자원금</span><b>"+fmtG(cost)+"</b></div><div class=row><span>평가손익</span><b class=\\""+cl(pl)+"\\">"+fmtG(pl)+"</b></div><div class=row><span>수익률</span><b class=\\""+cl(plp)+"\\">"+fmtP(plp)+"</b></div>";var hl=document.getElementById("hold");hl.innerHTML=hold.length?hold.map(function(h){return "<tr><td class=sym>"+esc(h.sym)+"</td><td style=\\"text-align:right\\">"+h.sh+"주</td><td style=\\"text-align:right\\">"+fmtG(h.v)+"</td><td class=\\""+cl(h.pl)+"\\" style=\\"text-align:right\\">"+fmtP(h.plp)+"</td></tr>";}).join(""):"<tr><td colspan=4 class=empty>보유 종목 없음</td></tr>";var tx=(p.transactions||[]).slice(0,15);document.getElementById("hist").innerHTML=tx.length?tx.map(function(t){return "<tr><td>"+new Date(t.at).toLocaleString("ko-KR",{hour12:false})+"</td><td><span class=\\""+(t.type==="buy"?"badge-buy":"badge-sell")+"\\">"+(t.type==="buy"?"매수":"매도")+"</span></td><td class=sym>"+esc(t.symbol)+"</td><td style=\\"text-align:right\\">"+t.shares+"주</td><td style=\\"text-align:right\\">"+fmtG(t.price)+"</td></tr>";}).join(""):"<tr><td colspan=5 class=empty>거래내역 없음</td></tr>";}',
 'document.getElementById("tg").addEventListener("click",tg);',
 'renderMarket();renderAccount();',
 'document.getElementById("upd").textContent=new Date(D.lastUpdate||Date.now()).toLocaleTimeString("ko-KR",{hour12:false});',
@@ -104,7 +95,7 @@ function buildOfflineHtml(payload) {
     return head + '\n' + body + '\n' + tail
 }
 
-// ── 데이터 수집 + 파일 쓰기 ──
+// ── 데이터 수집 + 파일 쓰기 (KubeJS 내장 API 사용) ──
 global.writeOfflineDashboard = function () {
     if (!global.STOCK_CONFIG.offlineDashboardEnabled) return
     try {
@@ -131,8 +122,13 @@ global.writeOfflineDashboard = function () {
         }
 
         var html = buildOfflineHtml(payload)
-        var path = _Paths.get(global.STOCK_CONFIG.offlineDashboardPath)
-        _Files.write(path, java.lang.String(html).getBytes(_StandardCharsets.UTF_8))
+
+        // KubeJS 내장 파일 쓰기 사용 (java.nio.file 클래스 필터 우회)
+        var path = global.STOCK_CONFIG.offlineDashboardPath
+        // JsonIO.write 는 JSON만 가능하므로, 대시보드 데이터를 JSON으로 export
+        // HTML은 직접 쓸 수 없으므로 데이터만 JSON으로 저장하고
+        // 웹에서 읽어가는 방식으로 전환
+        JsonIO.write(path.replace('.html', '.json'), payload)
     } catch (e) {
         console.error('[StockSystem] 오프라인 대시보드 생성 오류: ' + e)
     }
@@ -150,5 +146,5 @@ ServerEvents.tick(function (event) {
 // 서버 로드 직후 1회 생성
 ServerEvents.loaded(function (event) {
     global.writeOfflineDashboard()
-    console.info('[StockSystem] 오프라인 대시보드 생성: ' + global.STOCK_CONFIG.offlineDashboardPath)
+    console.info('[StockSystem] 오프라인 대시보드 JSON 생성: ' + global.STOCK_CONFIG.offlineDashboardPath.replace('.html', '.json'))
 })

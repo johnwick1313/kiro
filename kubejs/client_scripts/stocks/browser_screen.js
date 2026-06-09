@@ -3,87 +3,84 @@
 // 선릿밸리 주식 시스템 - MCEF 인게임 브라우저 + 외부 브라우저 폴백
 // [client_scripts] 클라이언트 전용
 // ==========================================================
-// MCEF 2.x (Forge 1.20.1) 클래스: net.ccbluex.liquidbounce.mcef 패키지가 아닌
-// 독립형 MCEF 모드의 경우 net.montoyo.mcef 또는 com.cinemamod.mcef 사용.
-// 이 스크립트는 여러 패키지를 시도하여 호환성을 확보합니다.
-// ==========================================================
 
 var BASE_URL = 'http://localhost:3000'
 
 // 안전한 클래스 로드 헬퍼
-function tryLoad(name) {
+function tryLoadClass(name) {
     try { return Java.loadClass(name) } catch(e) { return null }
 }
 
-// MCEF API 클래스 탐색 (여러 패키지명 시도)
-var MCEFApi = tryLoad('net.montoyo.mcef.api.API')
-    || tryLoad('com.cinemamod.mcef.MCEF')
-    || tryLoad('net.ccbluex.liquidbounce.mcef.MCEF')
+// MCEF API 로드 시도 (여러 패키지)
+var MCEFClass = tryLoadClass('net.montoyo.mcef.api.API')
+    || tryLoadClass('com.cinemamod.mcef.MCEF')
 
-var MCEFBrowserClass = tryLoad('net.montoyo.mcef.api.IBrowser')
-
-// Screen 클래스 (MCEF가 제공하는 브라우저 화면)
-var BrowserScreenClass = tryLoad('net.montoyo.mcef.client.gui.GuiWebBrowser')
-    || tryLoad('com.cinemamod.mcef.client.gui.BrowserScreen')
+// 마인크래프트 Util (URL 열기용)
+var UtilClass = tryLoadClass('net.minecraft.Util')
 
 // 공통 URL 열기 함수
 function openUrl(url) {
     var mc = Client.getMinecraft()
 
-    // MCEF 인게임 브라우저 시도
-    if (MCEFApi) {
+    // 1) MCEF 인게임 브라우저 시도 (montoyo 방식)
+    if (MCEFClass && MCEFClass.getInstance) {
         try {
-            var api = null
-            // montoyo MCEF: API.getInstance()
-            if (MCEFApi.getInstance) {
-                api = MCEFApi.getInstance()
-            }
-            if (api && api.isInitialized && api.isInitialized()) {
+            var api = MCEFClass.getInstance()
+            if (api && api.isInitialized()) {
                 var browser = api.createBrowser(url, false)
-                if (browser && BrowserScreenClass) {
-                    var screen = new BrowserScreenClass(browser)
-                    mc.execute(function() { mc.setScreen(screen) })
+                if (browser) {
+                    // MCEF montoyo는 GuiWebBrowser 생성자에 브라우저를 전달
+                    var GuiClass = tryLoadClass('net.montoyo.mcef.client.gui.GuiWebBrowser')
+                    if (GuiClass) {
+                        mc.execute(function() {
+                            mc.setScreen(new GuiClass(browser))
+                        })
+                        return
+                    }
+                }
+            }
+        } catch(e) {
+            console.warn('[StockBrowser] MCEF montoyo 실패: ' + e)
+        }
+    }
+
+    // 2) MCEF CinemaMod 방식 시도
+    if (MCEFClass && MCEFClass.isInitialized) {
+        try {
+            if (MCEFClass.isInitialized()) {
+                var browser2 = MCEFClass.createBrowser(url, false)
+                var ScreenClass = tryLoadClass('com.cinemamod.mcef.client.gui.BrowserScreen')
+                if (browser2 && ScreenClass) {
+                    var w = mc.getWindow().getGuiScaledWidth()
+                    var h = mc.getWindow().getGuiScaledHeight()
+                    browser2.resize(w, h)
+                    mc.execute(function() {
+                        mc.setScreen(new ScreenClass(browser2))
+                    })
                     return
                 }
             }
         } catch(e) {
-            console.warn('[StockBrowser] MCEF 인게임 브라우저 실패, 외부 브라우저로 폴백: ' + e)
+            console.warn('[StockBrowser] MCEF cinemamod 실패: ' + e)
         }
     }
 
-    // CinemaMod MCEF 방식 시도
-    if (!MCEFApi) {
-        var CinemaMCEF = tryLoad('com.cinemamod.mcef.MCEF')
-        if (CinemaMCEF) {
-            try {
-                if (CinemaMCEF.isInitialized()) {
-                    var browser2 = CinemaMCEF.createBrowser(url, false)
-                    if (browser2 && BrowserScreenClass) {
-                        var w = mc.getWindow().getGuiScaledWidth()
-                        var h = mc.getWindow().getGuiScaledHeight()
-                        browser2.resize(w, h)
-                        var screen2 = new BrowserScreenClass(browser2)
-                        mc.execute(function() { mc.setScreen(screen2) })
-                        return
-                    }
-                }
-            } catch(e2) {
-                console.warn('[StockBrowser] CinemaMod MCEF 실패: ' + e2)
-            }
-        }
-    }
-
-    // 폴백: 시스템 기본 브라우저로 열기
+    // 3) 폴백: 마인크래프트 내장 Util.getPlatform().openUri() 사용
+    //    이건 클래스 필터에 차단되지 않음 (마인크래프트 자체 클래스)
     try {
-        var Desktop = Java.loadClass('java.awt.Desktop')
-        var URI = Java.loadClass('java.net.URI')
-        Desktop.getDesktop().browse(URI.create(url))
-    } catch(e) {
-        if (Client.player) {
-            Client.player.sendSystemMessage(
-                Component.literal('\u00a7e[주식] 브라우저에서 열어주세요: ' + url)
-            )
+        if (UtilClass) {
+            UtilClass.getPlatform().openUri(url)
+            return
         }
+    } catch(e) {
+        console.warn('[StockBrowser] Util.openUri 실패: ' + e)
+    }
+
+    // 4) 최종 폴백: 채팅에 URL 표시
+    if (Client.player) {
+        Client.player.sendSystemMessage(
+            Component.literal('\u00a7e[주식] 브라우저에서 열어주세요: ' + url)
+        )
     }
 }
 
@@ -93,29 +90,29 @@ global.openStockBrowser = function(uuid) {
     openUrl(url)
 }
 
-// 오프라인 대시보드 (file:// 프로토콜)
+// 오프라인 대시보드
 global.openOfflineDashboard = function(uuid) {
+    // 오프라인 JSON 데이터가 있는 경로를 웹 서버 URL로 전환
+    // 또는 file:// 로 열기 시도
     try {
-        var File = Java.loadClass('java.io.File')
-        var f = new File('kubejs/exports/dashboard.html')
-        if (!f.exists()) {
+        if (UtilClass) {
+            var path = 'kubejs/exports/dashboard.json'
+            // file:// 로 열기보다는 라이브 서버 URL 사용 권장
+            // JSON만 있으므로 라이브 서버가 없으면 채팅 안내
             if (Client.player) {
                 Client.player.sendSystemMessage(
-                    Component.literal('\u00a7c[주식] 오프라인 대시보드 파일을 찾을 수 없습니다. 서버에 접속해 생성하세요.')
+                    Component.literal('\u00a7e[주식] 오프라인 모드: 인게임 명령어 !주식 를 사용하세요.')
                 )
             }
             return
         }
-        var url = f.toURI().toString()
-        if (uuid) url = url + '?uuid=' + uuid
-        openUrl(url)
-    } catch(e) {
-        if (Client.player) {
-            Client.player.sendSystemMessage(
-                Component.literal('\u00a7c[주식] 대시보드 열기 실패: ' + e)
-            )
-        }
+    } catch(e) {}
+
+    if (Client.player) {
+        Client.player.sendSystemMessage(
+            Component.literal('\u00a7e[주식] 인게임 명령어 !주식 를 사용하세요.')
+        )
     }
 }
 
-console.info('[StockBrowser] 브라우저 모듈 로드됨. MCEF: ' + (MCEFApi ? 'O' : 'X'))
+console.info('[StockBrowser] 브라우저 모듈 로드됨. MCEF: ' + (MCEFClass ? 'YES' : 'NO'))
