@@ -23,8 +23,8 @@ function sendWebLink(player) {
                 Text.of('[ 대시보드 열기 - 자동 로그인 ]')
                     .color('aqua')
                     .underlined(true)
-                    .click({ type: 'open_url', value: url })
-                    .hover({ type: 'text', value: Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white') })
+                    .click('open_url:' + url)
+                    .hover(Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white'))
             )
     )
     player.tell(Text.gray('마크 내장 서버로 동작합니다 (별도 Node 서버 불필요). 인게임은 K 키.'))
@@ -32,23 +32,10 @@ function sendWebLink(player) {
 }
 
 function sendOfflineLink(player) {
-    let url = null
-    try {
-        const File = Java.type('java.io.File')
-        url = new File(global.STOCK_CONFIG.offlineDashboardPath).toURI().toString()
-    } catch (e) {}
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  📄 오프라인 대시보드 (서버 불필요)').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
-    if (url) {
-        player.tell(
-            Text.of('  ▶ ').color('green').append(
-                Text.of('[ 오프라인 대시보드 열기 ]').color('aqua').underlined(true)
-                    .click({ type: 'open_url', value: url + '?uuid=' + player.stringUuid })
-                    .hover({ type: 'text', value: Text.white('읽기 전용 · Node 서버 없이 동작') })
-            )
-        )
-    }
+    player.tell(Text.gray('오프라인 대시보드는 현재 지원되지 않습니다. !주식 웹 을 사용하세요.'))
     player.tell(Text.gray('인게임에서는 J 키로도 열 수 있습니다. (라이브 서버는 K 키)'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
