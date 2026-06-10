@@ -118,17 +118,12 @@ global.writeOfflineDashboard = function () {
             meta:       data.meta || {},
             players:    players,
             lastUpdate: data.lastUpdate || Date.now(),
-            currency:   { unit: global.Currency.unit(), label: global.Currency.label() },
+            currency:   { unit: (global.Currency && global.Currency.unit) ? global.Currency.unit() : 'G', label: (global.Currency && global.Currency.label) ? global.Currency.label() : 'Gold' },
         }
 
-        var html = buildOfflineHtml(payload)
-
         // KubeJS 내장 파일 쓰기 사용 (java.nio.file 클래스 필터 우회)
-        var path = global.STOCK_CONFIG.offlineDashboardPath
-        // JsonIO.write 는 JSON만 가능하므로, 대시보드 데이터를 JSON으로 export
-        // HTML은 직접 쓸 수 없으므로 데이터만 JSON으로 저장하고
-        // 웹에서 읽어가는 방식으로 전환
-        JsonIO.write(path.replace('.html', '.json'), payload)
+        var jsonPath = global.STOCK_CONFIG.offlineDashboardPath.replace('.html', '.json')
+        JsonIO.write(jsonPath, JsonIO.toJson(payload))
     } catch (e) {
         console.error('[StockSystem] 오프라인 대시보드 생성 오류: ' + e)
     }

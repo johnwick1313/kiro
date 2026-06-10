@@ -126,8 +126,8 @@ PlayerEvents.loggedIn(function(event) {
         Text.of('  ▶ ').color('green').append(
             Text.of('[ 대시보드 열기 — 자동 로그인 ]')
                 .color('aqua').underlined(true)
-                .click({ type: 'open_url', value: webUrl })
-                .hover({ type: 'text', value: Text.white(webUrl) })
+                .click('open_url:' + webUrl)
+                .hover(Text.white(webUrl))
         )
     )
     player.tell(Text.of('명령어: ').color('gray').append(Text.yellow('!주식 도움말')))
