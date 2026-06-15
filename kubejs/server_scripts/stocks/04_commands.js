@@ -14,20 +14,24 @@ function sendWebLink(player) {
     // UUID를 URL 파라미터에 포함 → 자동 로그인
     const uuid = player.stringUuid
     const url  = 'http://localhost:3000/?uuid=' + uuid
+
+    // 클라이언트에 네트워크 이벤트 전송 → MCEF 인게임 브라우저 열기
+    player.sendData('stock:open_browser', { url: url })
+
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  📈 선릿밸리 주식 거래소').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(
         Text.of('  ▶ ').color('green')
             .append(
-                Text.of('[ 대시보드 열기 - 자동 로그인 ]')
+                Text.of('[ 대시보드 열기 (외부 브라우저) ]')
                     .color('aqua')
                     .underlined(true)
                     .click('open_url:' + url)
                     .hover(Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white'))
             )
     )
-    player.tell(Text.gray('마크 내장 서버로 동작합니다 (별도 Node 서버 불필요). 인게임은 K 키.'))
+    player.tell(Text.gray('MCEF가 설치되어 있으면 인게임 브라우저가 자동으로 열립니다.'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 
