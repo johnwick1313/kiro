@@ -253,22 +253,16 @@ PlayerEvents.chat(event => {
 // 슬래시 명령어 등록: /stock <sub>
 // ═══════════════════════════════════════════════════════════
 ServerEvents.commandRegistry(event => {
-    var C = event.commands
-    var StringArg = C.argument('args', Command.STRING).suggests(function(ctx, builder) {
-        ['web','list','help','buy','sell','portfolio','balance','deposit','withdraw','history'].forEach(function(s) {
-            builder.suggest(s)
-        })
-        return builder.buildFuture()
-    })
+    const { commands: Commands, arguments: Arguments } = event
 
     event.register(
-        C.literal('stock').executes(function(ctx) {
-            sendHelp(ctx.source.player)
+        Commands.literal('stock').executes(function(ctx) {
+            sendHelp(ctx.source.getPlayerOrException())
             return 1
         }).then(
-            C.argument('args', Command.STRING).executes(function(ctx) {
-                var player = ctx.source.player
-                var input = String(Command.STRING.getResult(ctx, 'args')).trim()
+            Commands.argument('args', Arguments.GREEDY_STRING.create(event)).executes(function(ctx) {
+                var player = ctx.source.getPlayerOrException()
+                var input = String(Arguments.GREEDY_STRING.getResult(ctx, 'args')).trim()
                 var args = input.split(/\s+/)
                 var cmd = (args[0] || 'help').toLowerCase()
 
