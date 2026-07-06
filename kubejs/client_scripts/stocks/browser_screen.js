@@ -20,7 +20,7 @@ try {
 console.info('[StockBrowser] MCEF: ' + (MCEF ? 'YES' : 'NO'))
 
 // 서버에서 보낸 네트워크 이벤트 수신
-NetworkEvents.dataReceived('stock:open_browser', function(event) {
+NetworkEvents.dataReceived('stock_open_browser', function(event) {
     try {
         var url = event.data.getString('url')
         if (!url) return

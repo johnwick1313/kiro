@@ -16,7 +16,11 @@ function sendWebLink(player) {
     const url  = 'http://localhost:3000/?uuid=' + uuid
 
     // 클라이언트에 네트워크 이벤트 전송 → MCEF 인게임 브라우저 열기
-    player.sendData('stock:open_browser', { url: url })
+    try {
+        player.sendData('stock_open_browser', {url: url})
+    } catch(e) {
+        // sendData 실패해도 채팅 링크는 제공
+    }
 
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  📈 선릿밸리 주식 거래소').color('yellow').bold(true))
@@ -24,14 +28,14 @@ function sendWebLink(player) {
     player.tell(
         Text.of('  ▶ ').color('green')
             .append(
-                Text.of('[ 대시보드 열기 (외부 브라우저) ]')
+                Text.of('[ 대시보드 열기 (클릭) ]')
                     .color('aqua')
                     .underlined(true)
                     .click('open_url:' + url)
-                    .hover(Text.of('클릭 시 ' + player.name.string + ' 으로 자동 로그인됩니다').color('white'))
+                    .hover(Text.of('클릭하면 브라우저가 열립니다').color('white'))
             )
     )
-    player.tell(Text.gray('MCEF가 설치되어 있으면 인게임 브라우저가 자동으로 열립니다.'))
+    player.tell(Text.gray('MCEF 설치 시 인게임 브라우저가 자동으로 열립니다.'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 
@@ -185,7 +189,13 @@ function handleWithdraw(player, playerData, amount) {
 
 // 채팅 이벤트로 명령어 처리
 PlayerEvents.chat(event => {
-    const message = (event.message || '').trim()
+    // KubeJS 2001: event.message는 string, event.getMessage()도 가능
+    var message = ''
+    try {
+        message = String(event.message || event.getMessage() || '').trim()
+    } catch(e) {
+        try { message = event.component.getString() } catch(e2) { return }
+    }
     if (!message.startsWith('!주식') && !message.startsWith('!stock')) return
 
     event.cancel()
