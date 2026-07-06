@@ -187,7 +187,7 @@ function handleWithdraw(player, playerData, amount) {
     player.tell(Text.gold('현재 잔고: ' + playerData.balance.toFixed(2) + ' ' + U))
 }
 
-// 채팅 이벤트로 명령어 처리
+// 채팅 이벤트로 명령어 처리 (모드 충돌 시 동작 안 할 수 있음)
 PlayerEvents.chat(event => {
     // KubeJS 2001: event.message는 string, event.getMessage()도 가능
     var message = ''
@@ -247,4 +247,71 @@ PlayerEvents.chat(event => {
     }
 
     if (dirty) global.saveStockData(data)
+})
+
+// ═══════════════════════════════════════════════════════════
+// 슬래시 명령어 등록: /stock <sub>
+// ═══════════════════════════════════════════════════════════
+ServerEvents.commandRegistry(event => {
+    var C = event.commands
+    var StringArg = C.argument('args', Command.STRING).suggests(function(ctx, builder) {
+        ['web','list','help','buy','sell','portfolio','balance','deposit','withdraw','history'].forEach(function(s) {
+            builder.suggest(s)
+        })
+        return builder.buildFuture()
+    })
+
+    event.register(
+        C.literal('stock').executes(function(ctx) {
+            sendHelp(ctx.source.player)
+            return 1
+        }).then(
+            C.argument('args', Command.STRING).executes(function(ctx) {
+                var player = ctx.source.player
+                var input = String(Command.STRING.getResult(ctx, 'args')).trim()
+                var args = input.split(/\s+/)
+                var cmd = (args[0] || 'help').toLowerCase()
+
+                var data = global.getStockData()
+                var playerData = global.getPlayerData(data, player.stringUuid, player.username || player.name.string)
+                var dirty = false
+
+                switch (cmd) {
+                    case 'web': case '웹': case 'gui':
+                        sendWebLink(player); break
+                    case 'help': case '도움말': case '?':
+                        sendHelp(player); break
+                    case 'list': case '목록': case 'ls':
+                        sendList(player, data); break
+                    case 'quote': case '시세': case 'q':
+                        sendQuote(player, data, args[1]); break
+                    case 'buy': case '매수': {
+                        var r = global.executeBuy(data, playerData, args[1], parseInt(args[2]))
+                        player.tell(Text.of(r.message).color(r.ok ? 'green' : 'red'))
+                        dirty = r.ok; break
+                    }
+                    case 'sell': case '매도': {
+                        var r2 = global.executeSell(data, playerData, args[1], parseInt(args[2]))
+                        player.tell(Text.of(r2.message).color(r2.ok ? 'green' : 'red'))
+                        dirty = r2.ok; break
+                    }
+                    case 'portfolio': case '포트폴리오': case 'p':
+                        sendPortfolio(player, data, playerData); break
+                    case 'balance': case '잔고': case 'bal':
+                        player.tell(Text.gold('잔고: ' + Number(playerData.balance || 0).toFixed(2) + ' G')); break
+                    case 'deposit': case '충전':
+                        handleDeposit(player, data, playerData, parseInt(args[1])); dirty = true; break
+                    case 'withdraw': case '출금':
+                        handleWithdraw(player, playerData, parseInt(args[1])); dirty = true; break
+                    case 'history': case '거래내역':
+                        sendHistory(player, playerData); break
+                    default:
+                        player.tell(Text.red('알 수 없는 명령: ' + cmd))
+                        sendHelp(player)
+                }
+                if (dirty) global.saveStockData(data)
+                return 1
+            })
+        )
+    )
 })
