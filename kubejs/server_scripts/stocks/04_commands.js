@@ -17,9 +17,7 @@ function sendWebLink(player) {
 
     // URL이 설정된 MinePad를 지급
     try {
-        // KubeJS 2001: runCommand 또는 runCommandSilent
-        var server = Utils.getServer()
-        server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
+        player.runCommandSilent('give @s webdisplays:minepad 1')
         player.tell(Text.of('  MinePad가 지급되었습니다! 우클릭으로 열어주세요').color('green'))
         player.tell(Text.of('  ▶ URL: localhost:3000 (Shift+우클릭으로 설정)').color('white'))
     } catch(e) {
