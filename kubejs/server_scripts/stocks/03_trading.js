@@ -114,19 +114,33 @@ global.processOrders = function (server) {
             var depositAmt = (order.amount != null ? order.amount : order.emeralds)
             var depositPlayer = server ? server.getPlayer(order.uuid) : null
             if (depositPlayer) {
-                depositPlayer.chat('!주식 충전 ' + depositAmt)
-                res = { ok: true, message: '충전 명령 전달됨' }
+                var depositResult = global.Currency.take(depositPlayer, Number(depositAmt))
+                if (depositResult.ok) {
+                    playerData.balance += depositResult.taken
+                    res = { ok: true, message: depositResult.taken + ' G 충전 완료' }
+                } else {
+                    res = { ok: false, message: depositResult.message }
+                }
             } else {
-                res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 !주식 충전 명령어를 사용하세요.' }
+                res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 /stock deposit 명령어를 사용하세요.' }
             }
         } else if (order.type === 'withdraw') {
             var withdrawAmt = (order.amount != null ? order.amount : order.emeralds)
             var withdrawPlayer = server ? server.getPlayer(order.uuid) : null
             if (withdrawPlayer) {
-                withdrawPlayer.chat('!주식 출금 ' + withdrawAmt)
-                res = { ok: true, message: '출금 명령 전달됨' }
+                if (Number(playerData.balance) < Number(withdrawAmt)) {
+                    res = { ok: false, message: '잔고 부족' }
+                } else {
+                    var withdrawResult = global.Currency.give(withdrawPlayer, Number(withdrawAmt))
+                    if (withdrawResult.ok) {
+                        playerData.balance -= withdrawResult.given
+                        res = { ok: true, message: withdrawResult.given + ' G 출금 완료' }
+                    } else {
+                        res = { ok: false, message: withdrawResult.message }
+                    }
+                }
             } else {
-                res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 !주식 출금 명령어를 사용하세요.' }
+                res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 /stock withdraw 명령어를 사용하세요.' }
             }
         } else {
             res = { ok: false, message: '알 수 없는 주문 타입' }
