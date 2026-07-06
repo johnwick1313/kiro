@@ -4,6 +4,7 @@
 // ==========================================================
 
 function fmtPct(p) {
+    p = Number(p) || 0
     const sign = p >= 0 ? '+' : ''
     return sign + p.toFixed(2) + '%'
 }
@@ -105,8 +106,8 @@ function sendList(player, data) {
         const st = data.prices[s.symbol]
         if (!st) return
         const line = Text.of(pad(s.symbol, 6)).color('yellow')
-            .append(Text.of(pad(st.current.toFixed(2) + ' G', 14)).color('white'))
-            .append(Text.of(pad(fmtPct(st.change), 10)).color(colorChange(st.change)))
+            .append(Text.of(pad(Number(st.current || 0).toFixed(2) + ' G', 14)).color('white'))
+            .append(Text.of(pad(fmtPct(Number(st.change || 0)), 10)).color(colorChange(st.change)))
             .append(Text.of(s.name).color('gray'))
         player.tell(line)
     })
@@ -120,16 +121,16 @@ function sendQuote(player, data, symbol) {
     if (!st) { player.tell(Text.red('시세 없음')); return }
 
     player.tell(Text.of('━━━ ' + stock.name + ' (' + stock.symbol + ') ━━━').color('gold'))
-    player.tell(Text.of('현재가: ').color('aqua').append(Text.white(st.current.toFixed(2) + ' G')))
-    player.tell(Text.of('변동률: ').color('aqua').append(Text.of(fmtPct(st.change)).color(colorChange(st.change))))
-    player.tell(Text.of('일중고가: ').color('aqua').append(Text.white(st.high.toFixed(2) + ' G')))
-    player.tell(Text.of('일중저가: ').color('aqua').append(Text.white(st.low.toFixed(2) + ' G')))
+    player.tell(Text.of('현재가: ').color('aqua').append(Text.white(Number(st.current || 0).toFixed(2) + ' G')))
+    player.tell(Text.of('변동률: ').color('aqua').append(Text.of(fmtPct(Number(st.change || 0))).color(colorChange(st.change))))
+    player.tell(Text.of('일중고가: ').color('aqua').append(Text.white(Number(st.high || 0).toFixed(2) + ' G')))
+    player.tell(Text.of('일중저가: ').color('aqua').append(Text.white(Number(st.low || 0).toFixed(2) + ' G')))
     player.tell(Text.of('섹터: ').color('aqua').append(Text.white(stock.sector)))
 }
 
 function sendPortfolio(player, data, playerData) {
     player.tell(Text.of('━━━━━━ 포트폴리오 (' + playerData.username + ') ━━━━━━').color('gold'))
-    player.tell(Text.of('잔고: ' + playerData.balance.toFixed(2) + ' G').color('yellow'))
+    player.tell(Text.of('잔고: ' + Number(playerData.balance || 0).toFixed(2) + ' G').color('yellow'))
 
     const symbols = Object.keys(playerData.portfolio || {})
     if (symbols.length === 0) {
@@ -154,14 +155,14 @@ function sendPortfolio(player, data, playerData) {
 
         const line = Text.of(pad(sym, 6)).color('yellow')
             .append(Text.of(pad(shares + '주', 8)).color('white'))
-            .append(Text.of(pad('@' + avg.toFixed(2), 12)).color('gray'))
-            .append(Text.of(pad(value.toFixed(2) + 'G', 12)).color('white'))
+            .append(Text.of(pad('@' + Number(avg || 0).toFixed(2), 12)).color('gray'))
+            .append(Text.of(pad(Number(value || 0).toFixed(2) + 'G', 12)).color('white'))
             .append(Text.of(fmtPct(plPct)).color(colorChange(pl)))
         player.tell(line)
     })
 
     const totalPl = totalCost > 0 ? ((totalValue - playerData.balance - totalCost) / totalCost) * 100 : 0
-    player.tell(Text.of('총 자산: ' + totalValue.toFixed(2) + ' G  ').color('gold')
+    player.tell(Text.of('총 자산: ' + Number(totalValue || 0).toFixed(2) + ' G  ').color('gold')
         .append(Text.of('(평가손익 ' + fmtPct(totalPl) + ')').color(colorChange(totalPl))))
 }
 
@@ -175,7 +176,7 @@ function sendHistory(player, playerData) {
         const time = new Date(tx.at).toLocaleTimeString()
         player.tell(Text.of(time + ' ').color('dark_gray')
             .append(Text.of(t + ' ').color(c))
-            .append(Text.white(tx.symbol + ' ' + tx.shares + '주 @ ' + tx.price.toFixed(2))))
+            .append(Text.white(tx.symbol + ' ' + tx.shares + '주 @ ' + Number(tx.price || 0).toFixed(2))))
     })
 }
 
@@ -196,7 +197,7 @@ function handleDeposit(player, data, playerData, amount) {
 
     playerData.balance += res.taken
     player.tell(Text.green('충전 완료: ' + res.taken + ' ' + U + ' (' + global.Currency.label() + ' 차감)'))
-    player.tell(Text.gold('현재 잔고: ' + playerData.balance.toFixed(2) + ' ' + U))
+    player.tell(Text.gold('현재 잔고: ' + Number(playerData.balance || 0).toFixed(2) + ' ' + U))
 }
 
 // 출금: 주식계좌 잔고 -> 인벤토리 모드팩 화폐 (amount = G 금액)
@@ -206,7 +207,7 @@ function handleWithdraw(player, playerData, amount) {
     amount = Math.floor(amount)
 
     if (playerData.balance < amount) {
-        player.tell(Text.red('잔고 부족. 필요: ' + amount + ' ' + U + ' / 보유: ' + playerData.balance.toFixed(2) + ' ' + U))
+        player.tell(Text.red('잔고 부족. 필요: ' + amount + ' ' + U + ' / 보유: ' + Number(playerData.balance || 0).toFixed(2) + ' ' + U))
         return
     }
 
@@ -218,7 +219,7 @@ function handleWithdraw(player, playerData, amount) {
     if (res.given < amount) {
         player.tell(Text.gray('* 액면 단위로 떨어지지 않는 ' + (amount - res.given) + ' ' + U + ' 은 잔고에 남습니다.'))
     }
-    player.tell(Text.gold('현재 잔고: ' + playerData.balance.toFixed(2) + ' ' + U))
+    player.tell(Text.gold('현재 잔고: ' + Number(playerData.balance || 0).toFixed(2) + ' ' + U))
 }
 
 // 채팅 이벤트로 명령어 처리 (모드 충돌 시 동작 안 할 수 있음)
@@ -268,7 +269,7 @@ PlayerEvents.chat(event => {
         case '포트폴리오': case 'portfolio': case 'p':
             sendPortfolio(player, data, playerData); break
         case '잔고': case 'balance': case 'bal':
-            player.tell(Text.gold('잔고: ' + playerData.balance.toFixed(2) + ' G')); break
+            player.tell(Text.gold('잔고: ' + Number(playerData.balance || 0).toFixed(2) + ' G')); break
         case '충전': case 'deposit':
             handleDeposit(player, data, playerData, parseInt(args[1])); dirty = true; break
         case '출금': case 'withdraw':
