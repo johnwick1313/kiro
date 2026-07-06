@@ -15,23 +15,51 @@ function sendWebLink(player) {
     const uuid = player.stringUuid
     const url  = 'http://localhost:3000/?uuid=' + uuid
 
-    // URL이 설정된 MinePad를 지급
+    // MinePad 지급 시도 (여러 방법)
+    var gaveMinePad = false
     try {
-        player.runCommandSilent('give @s webdisplays:minepad 1')
-        player.tell(Text.of('  MinePad가 지급되었습니다! 우클릭으로 열어주세요').color('green'))
-        player.tell(Text.of('  ▶ URL: localhost:3000 (Shift+우클릭으로 설정)').color('white'))
-    } catch(e) {
-        player.tell(Text.of('  MinePad 지급 실패: ' + e).color('red'))
-        player.tell(Text.of('  직접 입력: /give @s webdisplays:minepad').color('gray'))
+        // 방법 1: player.runCommandSilent
+        if (player.runCommandSilent) {
+            player.runCommandSilent('give @s webdisplays:minepad 1')
+            gaveMinePad = true
+        }
+    } catch(e1) {}
+
+    if (!gaveMinePad) {
+        try {
+            // 방법 2: server.runCommandSilent
+            if (player.server && player.server.runCommandSilent) {
+                player.server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
+                gaveMinePad = true
+            }
+        } catch(e2) {}
+    }
+
+    if (!gaveMinePad) {
+        try {
+            // 방법 3: minecraftPlayer.getServer()
+            var mcPlayer = player.minecraftPlayer || player
+            if (mcPlayer.getServer) {
+                mcPlayer.getServer().getCommands().performPrefixedCommand(
+                    mcPlayer.createCommandSourceStack().withPermission(2),
+                    'give ' + player.name.string + ' webdisplays:minepad 1'
+                )
+                gaveMinePad = true
+            }
+        } catch(e3) {}
     }
 
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  📈 선릿밸리 주식 거래소').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
-    player.tell(Text.of('  MinePad가 지급되었습니다!').color('green'))
-    player.tell(Text.of('  ▶ 우클릭으로 바로 대시보드가 열립니다').color('white'))
-    player.tell(Text.of('  ▶ 안 열리면: Shift+우클릭 → localhost:3000 입력').color('gray'))
-    player.tell(Text.of('  * UUID 입력 없이 자동 로그인됩니다!').color('gray'))
+    if (gaveMinePad) {
+        player.tell(Text.of('  ✔ MinePad가 지급되었습니다!').color('green'))
+    } else {
+        player.tell(Text.of('  MinePad를 직접 꺼내세요: /give @s webdisplays:minepad').color('yellow'))
+    }
+    player.tell(Text.of('  ▶ MinePad 손에 들고 Shift+우클릭 → localhost:3000').color('white'))
+    player.tell(Text.of('  ▶ 그 다음부터는 우클릭만으로 열립니다').color('white'))
+    player.tell(Text.of('  * UUID 입력 없이 자동 로그인!').color('gray'))
     player.tell(
         Text.of('  ▶ ').color('green')
             .append(
