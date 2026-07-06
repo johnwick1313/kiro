@@ -70,16 +70,15 @@ global.STOCK_CONFIG = {
         // Spur = 1, Bevel = 8, Sprocket = 16, Cog = 64, Crown = 512, Sun = 4096
         // numismatics_utils 추가 코인이 있을 수 있음 - /kubejs hand 로 확인 후 추가
         coins: [
-            { id: 'numismatics:spur',     value: 1     },
-            { id: 'numismatics:bevel',    value: 8     },
-            { id: 'numismatics:sprocket', value: 16    },
-            { id: 'numismatics:cog',      value: 64    },
-            { id: 'numismatics:crown',    value: 512   },
-            { id: 'numismatics:sun',      value: 4096  },
-            // numismatics_utils 추가 코인 (ID 확인 후 수정)
-            // { id: 'numismatics_utils:coin_1', value: ??? },
-            // { id: 'numismatics_utils:coin_2', value: ??? },
-            // { id: 'numismatics_utils:coin_3', value: ??? },
+            { id: 'numismatics:spur',            value: 1        },
+            { id: 'numismatics:bevel',           value: 8        },
+            { id: 'numismatics:sprocket',        value: 16       },
+            { id: 'numismatics:cog',             value: 64       },
+            { id: 'numismatics:crown',           value: 512      },
+            { id: 'numismatics:sun',             value: 4096     },
+            { id: 'numismatics:neptunium_coin',  value: 32768    },
+            { id: 'numismatics:ancient_coin',    value: 262144   },
+            { id: 'numismatics:prismatic_coin',  value: 16777216 },
         ],
 
         // ── mode: 'scoreboard' ──
