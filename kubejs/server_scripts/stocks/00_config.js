@@ -65,18 +65,21 @@ global.STOCK_CONFIG = {
         // 화면/메시지에 표시할 화폐 단위명
         unit: 'G',
 
-        // ── mode: 'lightmans' / 'item' 공통 ──
-        // 코인 액면가 목록 (value 큰 것 -> 작은 것 순으로 자동 정렬됨)
-        // value = 코인 1개당 G 가치. 모드팩에 맞게 자유롭게 조정하세요.
-        // 코인 ID 가 다르면 인게임에서 /kubejs hand 로 확인 후 수정.
+        // ── Create: Numismatics 코인 체계 ──
+        // 선릿밸리 모드팩은 Numismatics를 사용합니다.
+        // Spur = 1, Bevel = 8, Sprocket = 16, Cog = 64, Crown = 512, Sun = 4096
+        // numismatics_utils 추가 코인이 있을 수 있음 - /kubejs hand 로 확인 후 추가
         coins: [
-            { id: 'lightmanscurrency:coin_copper',    value: 1     },
-            { id: 'lightmanscurrency:coin_iron',      value: 10    },
-            { id: 'lightmanscurrency:coin_gold',      value: 100   },
-            { id: 'lightmanscurrency:coin_emerald',   value: 1000  },
-            { id: 'lightmanscurrency:coin_diamond',   value: 10000 },
-            // 선릿밸리에서 netherite -> iridium 으로 리네임됨. 둘 중 존재하는 ID 사용.
-            { id: 'lightmanscurrency:coin_netherite', value: 100000 },
+            { id: 'numismatics:spur',     value: 1     },
+            { id: 'numismatics:bevel',    value: 8     },
+            { id: 'numismatics:sprocket', value: 16    },
+            { id: 'numismatics:cog',      value: 64    },
+            { id: 'numismatics:crown',    value: 512   },
+            { id: 'numismatics:sun',      value: 4096  },
+            // numismatics_utils 추가 코인 (ID 확인 후 수정)
+            // { id: 'numismatics_utils:coin_1', value: ??? },
+            // { id: 'numismatics_utils:coin_2', value: ??? },
+            // { id: 'numismatics_utils:coin_3', value: ??? },
         ],
 
         // ── mode: 'scoreboard' ──
