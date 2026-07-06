@@ -15,24 +15,24 @@ function sendWebLink(player) {
     const uuid = player.stringUuid
     const url  = 'http://localhost:3000/?uuid=' + uuid
 
-    // MinePad가 없으면 자동 지급
+    // URL이 설정된 MinePad를 지급 (NBT로 URL 포함)
+    // WebDisplays MinePad NBT: {PadURL:"url"} 형태
     try {
-        player.server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
-    } catch(e) {}
-
-    // 클라이언트에 네트워크 이벤트 전송 시도
-    try {
-        player.sendData('stock_open_browser', {url: url})
-    } catch(e) {}
+        var cmd = 'give ' + player.name.string + ' webdisplays:minepad{PadURL:"' + url + '"} 1'
+        player.server.runCommandSilent(cmd)
+    } catch(e) {
+        // NBT 형식이 다를 수 있으므로 일반 MinePad 지급 시도
+        try {
+            player.server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
+        } catch(e2) {}
+    }
 
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  📈 선릿밸리 주식 거래소').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  MinePad가 지급되었습니다!').color('green'))
-    player.tell(Text.of('  1. MinePad를 손에 들기').color('white'))
-    player.tell(Text.of('  2. Shift+우클릭으로 URL 설정: ').color('white').append(Text.of('localhost:3000').color('aqua')))
-    player.tell(Text.of('  3. 우클릭으로 대시보드 열기').color('white'))
-    player.tell(Text.of('').color('white'))
+    player.tell(Text.of('  ▶ 우클릭으로 바로 대시보드가 열립니다').color('white'))
+    player.tell(Text.of('  ▶ 안 열리면: Shift+우클릭 → localhost:3000 입력').color('gray'))
     player.tell(Text.of('  * UUID 입력 없이 자동 로그인됩니다!').color('gray'))
     player.tell(
         Text.of('  ▶ ').color('green')
