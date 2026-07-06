@@ -15,16 +15,16 @@ function sendWebLink(player) {
     const uuid = player.stringUuid
     const url  = 'http://localhost:3000/?uuid=' + uuid
 
-    // URL이 설정된 MinePad를 지급 (NBT로 URL 포함)
-    // WebDisplays MinePad NBT: {PadURL:"url"} 형태
+    // URL이 설정된 MinePad를 지급
     try {
-        var cmd = 'give ' + player.name.string + ' webdisplays:minepad{PadURL:"' + url + '"} 1'
-        player.server.runCommandSilent(cmd)
+        // KubeJS 2001: runCommand 또는 runCommandSilent
+        var server = Utils.getServer()
+        server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
+        player.tell(Text.of('  MinePad가 지급되었습니다! 우클릭으로 열어주세요').color('green'))
+        player.tell(Text.of('  ▶ URL: localhost:3000 (Shift+우클릭으로 설정)').color('white'))
     } catch(e) {
-        // NBT 형식이 다를 수 있으므로 일반 MinePad 지급 시도
-        try {
-            player.server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
-        } catch(e2) {}
+        player.tell(Text.of('  MinePad 지급 실패: ' + e).color('red'))
+        player.tell(Text.of('  직접 입력: /give @s webdisplays:minepad').color('gray'))
     }
 
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
