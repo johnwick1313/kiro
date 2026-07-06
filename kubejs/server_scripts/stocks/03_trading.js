@@ -111,21 +111,19 @@ global.processOrders = function (server) {
         } else if (order.type === 'sell') {
             res = global.executeSell(data, playerData, order.symbol, order.shares)
         } else if (order.type === 'deposit') {
-            // 웹에서 요청한 충전 — 인벤토리는 서버 측에서만 차감 가능
-            // 온라인 플레이어에게 인게임 처리 위임 (amount = G 금액)
-            const amt2 = (order.amount != null ? order.amount : order.emeralds)
-            const onlinePlayer2 = server ? server.getPlayer(order.uuid) : null
-            if (onlinePlayer2) {
-                onlinePlayer2.chat('!주식 충전 ' + amt2)
+            var depositAmt = (order.amount != null ? order.amount : order.emeralds)
+            var depositPlayer = server ? server.getPlayer(order.uuid) : null
+            if (depositPlayer) {
+                depositPlayer.chat('!주식 충전 ' + depositAmt)
                 res = { ok: true, message: '충전 명령 전달됨' }
             } else {
                 res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 !주식 충전 명령어를 사용하세요.' }
             }
         } else if (order.type === 'withdraw') {
-            const amt3 = (order.amount != null ? order.amount : order.emeralds)
-            const onlinePlayer3 = server ? server.getPlayer(order.uuid) : null
-            if (onlinePlayer3) {
-                onlinePlayer3.chat('!주식 출금 ' + amt3)
+            var withdrawAmt = (order.amount != null ? order.amount : order.emeralds)
+            var withdrawPlayer = server ? server.getPlayer(order.uuid) : null
+            if (withdrawPlayer) {
+                withdrawPlayer.chat('!주식 출금 ' + withdrawAmt)
                 res = { ok: true, message: '출금 명령 전달됨' }
             } else {
                 res = { ok: false, message: '플레이어가 오프라인입니다. 인게임에서 !주식 출금 명령어를 사용하세요.' }
