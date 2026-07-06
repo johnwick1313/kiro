@@ -67,29 +67,38 @@ async function api(path, opts) {
 async function autoLogin() {
   const params = new URLSearchParams(location.search)
   const uuid   = params.get('uuid')
-  if (!uuid) {
-    setUserDisplay(null)
-    return
+
+  if (uuid) {
+    // UUID가 URL에 있으면 해당 플레이어로 로그인
+    const r = await api('/api/player/' + encodeURIComponent(uuid))
+    if (!r.ok) {
+      setUserDisplay(null)
+      showConnLabel('UUID를 찾을 수 없음 (인게임 접속 필요)')
+      return
+    }
+    S.user.uuid     = uuid
+    S.user.username = r.username
+    S.user.data     = r
+    S.user.isOp     = !!r.isOp
+  } else {
+    // UUID 없으면 자동 로그인 (가장 최근 플레이어)
+    const r = await api('/api/auto-login')
+    if (!r.ok) {
+      setUserDisplay(null)
+      showConnLabel('인게임에서 !주식 를 한번 사용해주세요')
+      return
+    }
+    S.user.uuid     = r.uuid
+    S.user.username = r.username
+    S.user.data     = r
+    S.user.isOp     = !!r.isOp
   }
 
-  // 서버에 UUID → 플레이어 정보 + OP 여부 확인
-  const r = await api('/api/player/' + encodeURIComponent(uuid))
-  if (!r.ok) {
-    setUserDisplay(null)
-    showConnLabel('UUID를 찾을 수 없음 (인게임 접속 필요)')
-    return
-  }
-
-  S.user.uuid     = uuid
-  S.user.username = r.username
-  S.user.data     = r
-  S.user.isOp     = !!r.isOp
-
-  setUserDisplay(r.username, r.isOp)
+  setUserDisplay(S.user.username, S.user.isOp)
   renderAccount()
 
   // OP 이면 관리자 탭 표시
-  if (r.isOp) {
+  if (S.user.isOp) {
     $('admin-nav-btn').classList.remove('hidden')
   }
 }

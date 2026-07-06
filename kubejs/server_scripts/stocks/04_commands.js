@@ -15,27 +15,35 @@ function sendWebLink(player) {
     const uuid = player.stringUuid
     const url  = 'http://localhost:3000/?uuid=' + uuid
 
-    // 클라이언트에 네트워크 이벤트 전송 → MCEF 인게임 브라우저 열기
+    // MinePad가 없으면 자동 지급
+    try {
+        player.server.runCommandSilent('give ' + player.name.string + ' webdisplays:minepad 1')
+    } catch(e) {}
+
+    // 클라이언트에 네트워크 이벤트 전송 시도
     try {
         player.sendData('stock_open_browser', {url: url})
-    } catch(e) {
-        // sendData 실패해도 채팅 링크는 제공
-    }
+    } catch(e) {}
 
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
     player.tell(Text.of('  📈 선릿밸리 주식 거래소').color('yellow').bold(true))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
+    player.tell(Text.of('  MinePad가 지급되었습니다!').color('green'))
+    player.tell(Text.of('  1. MinePad를 손에 들기').color('white'))
+    player.tell(Text.of('  2. Shift+우클릭으로 URL 설정: ').color('white').append(Text.of('localhost:3000').color('aqua')))
+    player.tell(Text.of('  3. 우클릭으로 대시보드 열기').color('white'))
+    player.tell(Text.of('').color('white'))
+    player.tell(Text.of('  * UUID 입력 없이 자동 로그인됩니다!').color('gray'))
     player.tell(
         Text.of('  ▶ ').color('green')
             .append(
-                Text.of('[ 대시보드 열기 (클릭) ]')
+                Text.of('[ 외부 브라우저로 열기 ]')
                     .color('aqua')
                     .underlined(true)
                     .click('open_url:' + url)
                     .hover(Text.of('클릭하면 브라우저가 열립니다').color('white'))
             )
     )
-    player.tell(Text.gray('MCEF 설치 시 인게임 브라우저가 자동으로 열립니다.'))
     player.tell(Text.of('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').color('gold'))
 }
 

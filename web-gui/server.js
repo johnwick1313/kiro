@@ -135,6 +135,34 @@ app.get('/api/player/:id', (req, res) => {
   res.json(formatPlayer(found.uuid, found.data, state))
 })
 
+// ── 자동 로그인 (UUID 없이 접속 시 → 가장 최근 활동 플레이어 자동 반환) ──
+app.get('/api/auto-login', (req, res) => {
+  const state = readJson(P.state, null)
+  if (!state || !state.players) return res.status(503).json({ ok:false, message:'서버 데이터 없음' })
+
+  const entries = Object.entries(state.players)
+  if (entries.length === 0) return res.status(404).json({ ok:false, message:'등록된 플레이어 없음' })
+
+  // 가장 최근 거래가 있는 플레이어 선택, 없으면 첫 번째
+  let best = entries[0]
+  let bestTime = 0
+  for (const [uuid, data] of entries) {
+    const txs = data.transactions || []
+    if (txs.length > 0) {
+      const lastTx = txs[0].at || 0
+      if (lastTx > bestTime) {
+        bestTime = lastTx
+        best = [uuid, data]
+      }
+    }
+  }
+
+  // 플레이어가 1명이면 그냥 그 사람
+  if (entries.length === 1) best = entries[0]
+
+  res.json(formatPlayer(best[0], best[1], state))
+})
+
 // ── 매수/매도 주문 ──
 app.post('/api/order', (req, res) => {
   const { uuid, type, symbol, shares } = req.body || {}
